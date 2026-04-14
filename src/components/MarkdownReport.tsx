@@ -51,7 +51,7 @@ function splitIntoSections(markdown: string): { preamble: string; sections: Sect
 }
 
 const proseClasses =
-  "prose prose-invert prose-sm max-w-none prose-headings:font-semibold prose-headings:tracking-tight prose-h2:text-base prose-h2:mt-0 prose-h2:mb-3 prose-h3:text-sm prose-h3:mt-6 prose-h3:mb-2 prose-p:text-muted-foreground prose-p:leading-[1.7] prose-table:text-xs prose-th:text-left prose-th:font-medium prose-th:text-foreground prose-th:pb-2 prose-td:text-muted-foreground prose-td:py-1.5 prose-li:text-muted-foreground prose-li:leading-[1.7] prose-strong:text-foreground prose-code:text-xs prose-code:bg-muted prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:font-mono prose-a:text-primary prose-a:underline-offset-2 prose-hr:border-border";
+  "prose prose-invert max-w-none prose-headings:font-semibold prose-headings:tracking-tight prose-h3:text-base prose-h3:mt-8 prose-h3:mb-3 prose-p:text-muted-foreground prose-p:leading-[1.8] prose-p:text-[15px] prose-table:text-sm prose-th:text-left prose-th:font-medium prose-th:text-foreground prose-th:pb-2 prose-td:text-muted-foreground prose-td:py-2 prose-li:text-muted-foreground prose-li:leading-[1.8] prose-li:text-[15px] prose-strong:text-foreground prose-code:text-sm prose-code:bg-muted prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:font-mono prose-a:text-primary prose-a:underline-offset-2 prose-hr:border-border";
 
 const remarkPlugins = [remarkGfm];
 const rehypePlugins = [rehypeRaw, rehypeSlug];
@@ -76,7 +76,7 @@ function CollapsibleSection({
     >
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-3 w-full text-left px-5 py-4 group"
+        className="flex items-center gap-3 w-full text-left px-6 py-5 group"
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -92,7 +92,7 @@ function CollapsibleSection({
         >
           <path d="m9 18 6-6-6-6" />
         </svg>
-        <span className="text-sm font-semibold tracking-tight text-foreground group-hover:text-foreground/80 transition-colors">
+        <span className="text-base font-semibold tracking-tight text-foreground group-hover:text-foreground/80 transition-colors">
           {section.title}
         </span>
         {!open && (
@@ -102,7 +102,7 @@ function CollapsibleSection({
         )}
       </button>
       {open && (
-        <div className="px-5 pb-5 animate-fade-in">
+        <div className="px-6 pb-6 animate-fade-in">
           <article className={proseClasses}>
             <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={rehypePlugins}>
               {section.body}
@@ -130,7 +130,7 @@ function ReadingProgress() {
   if (progress < 2) return null;
 
   return (
-    <div className="fixed top-14 left-0 right-0 z-30 h-0.5 bg-border/30">
+    <div className="fixed top-16 left-0 right-0 z-30 h-0.5 bg-border/30">
       <div
         className="h-full bg-foreground/40 transition-[width] duration-150 ease-out"
         style={{ width: `${progress}%` }}
@@ -176,7 +176,7 @@ function TableOfContents({
 
   return (
     <nav className="hidden xl:block shrink-0 w-44">
-      <div className="sticky top-[calc(3.5rem+2rem+1px)]">
+        <div className="sticky top-[calc(4rem+2.5rem+1px)]">
         <div className="text-xs font-medium text-muted-foreground/50 uppercase tracking-wider mb-3">
           Sections
         </div>
@@ -271,7 +271,7 @@ export function MarkdownReport({
             </article>
           )}
 
-          <div className="space-y-3">
+          <div className="space-y-4">
             {sections.map((section, i) => (
               <CollapsibleSection
                 key={`${section.slug}-${i}`}

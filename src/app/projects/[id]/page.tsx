@@ -155,27 +155,24 @@ export default async function ProjectDetailPage({
           </svg>
           All projects
         </Link>
-        <div className="flex items-center justify-between mt-3">
-          <div>
-            <h1 className="text-xl font-semibold tracking-tight leading-none">
-              {project.name}
-            </h1>
+        <div className="mt-4">
+          <h1 className="text-3xl font-bold tracking-tight">
+            {project.name}
+          </h1>
+          <div className="flex items-center gap-4 mt-2">
             {project.repoUrl && (
-              <p className="text-[13px] text-muted-foreground mt-1.5">
+              <p className="text-sm text-muted-foreground">
                 {project.repoUrl}
               </p>
             )}
-          </div>
-          <div className="text-right">
-            <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">API Key</div>
-            <code className="text-xs bg-muted px-2 py-1 rounded font-mono text-muted-foreground">
+            <code className="text-xs bg-muted px-2 py-0.5 rounded font-mono text-muted-foreground">
               {project.apiKey.slice(0, 8)}...
             </code>
           </div>
         </div>
       </div>
 
-      <Separator className="mb-8" />
+      <Separator className="my-8" />
 
       {runsWithStats.length === 0 ? (
         <Card>

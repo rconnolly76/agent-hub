@@ -42,7 +42,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col bg-background text-foreground">
         <header className="border-b border-border bg-card/80 backdrop-blur-sm sticky top-0 z-40">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <div className="flex h-14 items-center justify-between">
+            <div className="flex h-16 items-center justify-between">
               <Link
                 href="/"
                 className="flex items-center gap-2.5 font-semibold tracking-tight"
@@ -64,7 +64,7 @@ export default function RootLayout({
           </div>
         </header>
         <main className="flex-1">
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 animate-fade-in">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10 animate-fade-in">
             {children}
           </div>
         </main>

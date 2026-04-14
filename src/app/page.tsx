@@ -164,16 +164,11 @@ export default async function HomePage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight leading-none">Projects</h1>
-          <p className="text-muted-foreground mt-1.5 text-[13px]">
-            Agentic skill outputs across all your projects
-          </p>
-        </div>
-        <div className="text-sm text-muted-foreground">
-          {projects.length} project{projects.length !== 1 ? "s" : ""}
-        </div>
+      <div className="mb-10">
+        <h1 className="text-3xl font-bold tracking-tight">Projects</h1>
+        <p className="text-muted-foreground mt-2">
+          {projects.length} project{projects.length !== 1 ? "s" : ""} with agentic skill outputs
+        </p>
       </div>
 
       {projects.length === 0 ? (
@@ -196,7 +191,7 @@ export default async function HomePage() {
               <Card className="hover:border-foreground/20 hover:bg-card/80 hover:shadow-lg hover:shadow-black/5 transition-all duration-200 cursor-pointer h-full">
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between gap-2">
-                    <CardTitle className="text-base">{project.name}</CardTitle>
+                    <CardTitle className="text-base font-semibold">{project.name}</CardTitle>
                     {getHealthBadge(project)}
                   </div>
                   {project.repoUrl && (
