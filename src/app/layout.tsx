@@ -14,8 +14,19 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Agent Hub",
+  title: {
+    default: "Agent Hub",
+    template: "%s — Agent Hub",
+  },
   description: "Central dashboard for agentic skill outputs across all projects",
+  icons: {
+    icon: [
+      {
+        url: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%23fff'/><text x='50%25' y='54%25' dominant-baseline='middle' text-anchor='middle' font-family='system-ui' font-weight='700' font-size='18' fill='%23111'>A</text></svg>",
+        type: "image/svg+xml",
+      },
+    ],
+  },
 };
 
 export default function RootLayout({
@@ -29,17 +40,23 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased dark`}
     >
       <body className="min-h-full flex flex-col bg-background text-foreground">
-        <header className="border-b border-border bg-card">
+        <header className="border-b border-border bg-card/80 backdrop-blur-sm sticky top-0 z-40">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="flex h-14 items-center justify-between">
               <Link
                 href="/"
-                className="flex items-center gap-2 font-semibold tracking-tight"
+                className="flex items-center gap-2.5 font-semibold tracking-tight"
               >
+                <span className="flex items-center justify-center w-7 h-7 rounded-lg bg-foreground text-background text-xs font-bold">
+                  A
+                </span>
                 <span className="text-lg">Agent Hub</span>
               </Link>
-              <nav className="flex items-center gap-4 text-sm text-muted-foreground">
-                <Link href="/" className="hover:text-foreground transition-colors">
+              <nav className="flex items-center gap-1 text-sm">
+                <Link
+                  href="/"
+                  className="px-3 py-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                >
                   Projects
                 </Link>
               </nav>
@@ -47,7 +64,7 @@ export default function RootLayout({
           </div>
         </header>
         <main className="flex-1">
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 animate-fade-in">
             {children}
           </div>
         </main>

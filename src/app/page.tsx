@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { runs, metrics, findings } from "@/lib/db/schema";
-import { eq, desc, sql } from "drizzle-orm";
+import { eq, sql, inArray } from "drizzle-orm";
 import Link from "next/link";
 import {
   Card,
@@ -34,57 +34,84 @@ async function getProjectsWithStats(): Promise<ProjectWithStats[]> {
     orderBy: (p, { desc }) => [desc(p.createdAt)],
   });
 
-  const projectStats: ProjectWithStats[] = [];
+  if (allProjects.length === 0) return [];
 
-  for (const project of allProjects) {
-    const projectRuns = await db.query.runs.findMany({
-      where: eq(runs.projectId, project.id),
-      orderBy: (r, { desc }) => [desc(r.createdAt)],
-    });
+  const projectIds = allProjects.map((p) => p.id);
 
+  const allRuns = await db.query.runs.findMany({
+    where: inArray(runs.projectId, projectIds),
+    orderBy: (r, { desc }) => [desc(r.createdAt)],
+  });
+
+  const runsByProject = new Map<string, typeof allRuns>();
+  for (const run of allRuns) {
+    const existing = runsByProject.get(run.projectId) ?? [];
+    existing.push(run);
+    runsByProject.set(run.projectId, existing);
+  }
+
+  const latestRunIds = allProjects
+    .map((p) => runsByProject.get(p.id)?.[0]?.id)
+    .filter((id): id is string => !!id);
+
+  let allMetrics: { runId: string; key: string; value: number; unit: string | null }[] = [];
+  let allFindings: { runId: string; count: number }[] = [];
+
+  if (latestRunIds.length > 0) {
+    const [metricsResult, findingsResult] = await Promise.all([
+      db.select().from(metrics).where(inArray(metrics.runId, latestRunIds)),
+      db
+        .select({
+          runId: findings.runId,
+          count: sql<number>`count(*)`.as("count"),
+        })
+        .from(findings)
+        .where(inArray(findings.runId, latestRunIds))
+        .groupBy(findings.runId),
+    ]);
+    allMetrics = metricsResult;
+    allFindings = findingsResult;
+  }
+
+  const metricsByRun = new Map<string, typeof allMetrics>();
+  for (const m of allMetrics) {
+    const existing = metricsByRun.get(m.runId) ?? [];
+    existing.push(m);
+    metricsByRun.set(m.runId, existing);
+  }
+
+  const findingsByRun = new Map<string, number>();
+  for (const f of allFindings) {
+    findingsByRun.set(f.runId, Number(f.count));
+  }
+
+  return allProjects.map((project) => {
+    const projectRuns = runsByProject.get(project.id) ?? [];
     let latestRun: ProjectWithStats["latestRun"] = null;
 
     if (projectRuns.length > 0) {
       const latest = projectRuns[0];
-
-      const criticalMetric = await db
-        .select()
-        .from(metrics)
-        .where(eq(metrics.runId, latest.id))
-        .then((m) => m.find((x) => x.key === "severity_critical"));
-
-      const warningMetric = await db
-        .select()
-        .from(metrics)
-        .where(eq(metrics.runId, latest.id))
-        .then((m) => m.find((x) => x.key === "severity_warning"));
-
-      const runFindings = await db
-        .select({ count: sql<number>`count(*)` })
-        .from(findings)
-        .where(eq(findings.runId, latest.id));
+      const runMetrics = metricsByRun.get(latest.id) ?? [];
 
       latestRun = {
         id: latest.id,
         skillType: latest.skillType,
         createdAt: latest.createdAt,
-        criticalCount: criticalMetric?.value ?? 0,
-        warningCount: warningMetric?.value ?? 0,
-        findingsCount: Number(runFindings[0]?.count ?? 0),
+        criticalCount: runMetrics.find((m) => m.key === "severity_critical")?.value ?? 0,
+        warningCount: runMetrics.find((m) => m.key === "severity_warning")?.value ?? 0,
+        findingsCount: findingsByRun.get(latest.id) ?? 0,
       };
     }
 
-    projectStats.push({
+    return {
       id: project.id,
       name: project.name,
       repoUrl: project.repoUrl,
       createdAt: project.createdAt,
       latestRun,
       runCount: projectRuns.length,
-    });
-  }
-
-  return projectStats;
+    };
+  });
 }
 
 function getHealthBadge(project: ProjectWithStats) {
@@ -93,20 +120,20 @@ function getHealthBadge(project: ProjectWithStats) {
   }
   if (project.latestRun.criticalCount > 0) {
     return (
-      <Badge variant="destructive">
+      <Badge className="bg-red-500/15 text-red-400 border-red-500/25">
         {project.latestRun.criticalCount} critical
       </Badge>
     );
   }
   if (project.latestRun.warningCount > 0) {
     return (
-      <Badge className="bg-amber-600 text-white hover:bg-amber-700">
+      <Badge className="bg-amber-500/15 text-amber-400 border-amber-500/25">
         {project.latestRun.warningCount} warnings
       </Badge>
     );
   }
   return (
-    <Badge className="bg-emerald-600 text-white hover:bg-emerald-700">
+    <Badge className="bg-emerald-500/15 text-emerald-400 border-emerald-500/25">
       Healthy
     </Badge>
   );
@@ -164,9 +191,9 @@ export default async function HomePage() {
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {projects.map((project) => (
-            <Link key={project.id} href={`/projects/${project.id}`}>
-              <Card className="hover:border-foreground/20 transition-colors cursor-pointer h-full">
+          {projects.map((project, i) => (
+            <Link key={project.id} href={`/projects/${project.id}`} className={`animate-fade-in-up stagger-${Math.min(i + 1, 6)}`}>
+              <Card className="hover:border-foreground/20 hover:bg-card/80 hover:shadow-lg hover:shadow-black/5 transition-all duration-200 cursor-pointer h-full">
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between gap-2">
                     <CardTitle className="text-base">{project.name}</CardTitle>

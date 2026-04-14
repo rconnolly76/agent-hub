@@ -7,7 +7,8 @@ export async function GET() {
   const allProjects = await db.query.projects.findMany({
     orderBy: (p, { desc }) => [desc(p.createdAt)],
   });
-  return NextResponse.json(allProjects);
+  const safe = allProjects.map(({ apiKey: _key, ...rest }) => rest);
+  return NextResponse.json(safe);
 }
 
 export async function POST(req: NextRequest) {

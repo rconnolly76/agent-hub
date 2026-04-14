@@ -7,8 +7,30 @@ import { Badge } from "@/components/ui/badge";
 import { MarkdownReport } from "@/components/MarkdownReport";
 import { MetricsSidebar } from "@/components/MetricsSidebar";
 import { ScreenshotGallery } from "@/components/ScreenshotGallery";
+import type { Metadata } from "next";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+  const uuidRegex =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!uuidRegex.test(id)) return { title: "Not Found" };
+  const run = await db.query.runs.findFirst({
+    where: (r, { eq }) => eq(r.id, id),
+    with: { project: true },
+  });
+  if (!run) return { title: "Run" };
+  const skillLabel = run.skillType
+    .replace(/^ux-/, "")
+    .replace(/-/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+  return { title: `${skillLabel} — ${run.project.name}` };
+}
 
 function formatSkillType(type: string): string {
   return type
@@ -23,6 +45,10 @@ export default async function RunDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+
+  const uuidRegex =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!uuidRegex.test(id)) return notFound();
 
   const run = await db.query.runs.findFirst({
     where: (r, { eq }) => eq(r.id, id),
@@ -67,9 +93,23 @@ export default async function RunDetailPage({
       <div className="mb-6">
         <Link
           href={`/projects/${run.project.id}`}
-          className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors group"
         >
-          &larr; {run.project.name}
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="transition-transform group-hover:-translate-x-0.5"
+          >
+            <path d="m15 18-6-6 6-6" />
+          </svg>
+          {run.project.name}
         </Link>
         <div className="flex items-center gap-3 mt-3">
           <h1 className="text-2xl font-semibold tracking-tight">Run Detail</h1>
@@ -108,8 +148,8 @@ export default async function RunDetailPage({
           )}
         </div>
 
-        <aside className="order-first lg:order-last">
-          <div className="lg:sticky lg:top-8">
+        <aside className="lg:order-last">
+          <div className="lg:sticky lg:top-[calc(3.5rem+2rem+1px)]">
             <MetricsSidebar
               metrics={runMetrics}
               findings={runFindings}
