@@ -175,26 +175,28 @@ function TableOfContents({
   if (sections.length < 3) return null;
 
   return (
-    <nav className="mb-6 rounded-lg border border-border bg-card/50 px-4 py-3">
-      <div className="text-[10px] font-medium text-muted-foreground/60 uppercase tracking-wider mb-2">
-        Sections
+    <nav className="hidden xl:block shrink-0 w-44">
+      <div className="sticky top-[calc(3.5rem+2rem+1px)]">
+        <div className="text-[10px] font-medium text-muted-foreground/50 uppercase tracking-wider mb-3">
+          Sections
+        </div>
+        <ul className="space-y-0.5 border-l border-border pl-0">
+          {sections.map((s, i) => (
+            <li key={`${s.slug}-${i}`}>
+              <button
+                onClick={() => onJump(s.slug)}
+                className={`block w-full text-left text-[11px] leading-snug py-1.5 pl-3 -ml-px border-l-2 transition-colors ${
+                  activeSlug === s.slug
+                    ? "text-foreground border-foreground font-medium"
+                    : "text-muted-foreground border-transparent hover:text-foreground hover:border-muted-foreground/40"
+                }`}
+              >
+                {s.title}
+              </button>
+            </li>
+          ))}
+        </ul>
       </div>
-      <ul className="space-y-0.5">
-        {sections.map((s, i) => (
-          <li key={`${s.slug}-${i}`}>
-            <button
-              onClick={() => onJump(s.slug)}
-              className={`block w-full text-left text-xs py-1 px-2 rounded transition-colors truncate ${
-                activeSlug === s.slug
-                  ? "text-foreground bg-muted font-medium"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-              }`}
-            >
-              {s.title}
-            </button>
-          </li>
-        ))}
-      </ul>
     </nav>
   );
 }
@@ -257,25 +259,29 @@ export function MarkdownReport({
       <ReadingProgress />
       <BackToTop />
 
-      <TableOfContents sections={sections} activeSlug={activeSlug} onJump={handleJump} />
+      <div className="flex gap-6">
+        <TableOfContents sections={sections} activeSlug={activeSlug} onJump={handleJump} />
 
-      {preamble && (
-        <article className={`${proseClasses} mb-6`}>
-          <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={rehypePlugins}>
-            {preamble}
-          </ReactMarkdown>
-        </article>
-      )}
+        <div className="min-w-0 flex-1">
+          {preamble && (
+            <article className={`${proseClasses} mb-6`}>
+              <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={rehypePlugins}>
+                {preamble}
+              </ReactMarkdown>
+            </article>
+          )}
 
-      <div className="space-y-3">
-        {sections.map((section, i) => (
-          <CollapsibleSection
-            key={`${section.slug}-${i}`}
-            section={section}
-            defaultOpen={i < 2}
-            isActive={activeSlug === section.slug}
-          />
-        ))}
+          <div className="space-y-3">
+            {sections.map((section, i) => (
+              <CollapsibleSection
+                key={`${section.slug}-${i}`}
+                section={section}
+                defaultOpen={i < 2}
+                isActive={activeSlug === section.slug}
+              />
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );
