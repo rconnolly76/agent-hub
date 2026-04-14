@@ -137,6 +137,112 @@
   }
 }
 
+.report-prose h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin-top: 2rem;
+  margin-bottom: 0.75rem;
+}
+
+.report-prose h4 {
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.report-prose p {
+  color: var(--muted-foreground);
+  font-size: 0.9375rem;
+  line-height: 1.8;
+  margin-bottom: 1em;
+}
+
+.report-prose li {
+  color: var(--muted-foreground);
+  font-size: 0.9375rem;
+  line-height: 1.8;
+}
+
+.report-prose ul,
+.report-prose ol {
+  padding-left: 1.5rem;
+  margin-bottom: 1em;
+}
+
+.report-prose strong {
+  color: var(--foreground);
+  font-weight: 600;
+}
+
+.report-prose code {
+  font-size: 0.875rem;
+  background: var(--muted);
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  font-family: var(--font-mono);
+}
+
+.report-prose a {
+  color: var(--primary);
+  text-underline-offset: 2px;
+}
+
+.report-prose hr {
+  border-color: var(--border);
+  margin: 1.5rem 0;
+}
+
+.report-prose blockquote {
+  border-left: 3px solid var(--border);
+  padding-left: 1rem;
+  color: var(--muted-foreground);
+  font-style: italic;
+  margin: 1rem 0;
+}
+
+.report-table-th {
+  padding: 0.625rem 0.75rem !important;
+  text-align: left !important;
+  font-size: 0.75rem !important;
+  font-weight: 600 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+  color: var(--muted-foreground) !important;
+  white-space: nowrap !important;
+  line-height: 1.4 !important;
+}
+
+.report-table-td {
+  padding: 0.5rem 0.75rem !important;
+  font-size: 0.875rem !important;
+  color: var(--muted-foreground) !important;
+  vertical-align: top !important;
+  line-height: 1.4 !important;
+}
+
+.report-table p,
+.report-table li {
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: 1.4 !important;
+  font-size: inherit !important;
+}
+
+.report-table strong {
+  color: var(--foreground) !important;
+  font-weight: 600 !important;
+}
+
+.report-table code {
+  font-size: 0.75rem !important;
+  background: var(--muted) !important;
+  padding: 0.125rem 0.25rem !important;
+  border-radius: 0.25rem !important;
+  font-family: var(--font-mono) !important;
+}
+
 @keyframes fade-in-up {
   from {
     opacity: 0;

@@ -39,6 +39,22 @@ function formatSkillType(type: string): string {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+function formatDate(date: Date): string {
+  const weekday = WEEKDAYS[date.getDay()];
+  const month = MONTHS[date.getMonth()];
+  const day = date.getDate();
+  const year = date.getFullYear();
+  const hours = date.getHours();
+  const minutes = date.getMinutes();
+  const ampm = hours >= 12 ? "PM" : "AM";
+  const h = hours % 12 || 12;
+  const m = minutes.toString().padStart(2, "0");
+  return `${weekday}, ${month} ${day}, ${year} at ${h}:${m} ${ampm}`;
+}
+
 export default async function RunDetailPage({
   params,
 }: {
@@ -116,17 +132,7 @@ export default async function RunDetailPage({
             {formatSkillType(run.skillType)}
           </h1>
           <p className="text-sm text-muted-foreground mt-2">
-            {run.createdAt.toLocaleDateString("en-US", {
-              weekday: "long",
-              month: "long",
-              day: "numeric",
-              year: "numeric",
-            })}
-            {" at "}
-            {run.createdAt.toLocaleTimeString("en-US", {
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
+            {formatDate(run.createdAt)}
           </p>
         </div>
       </div>

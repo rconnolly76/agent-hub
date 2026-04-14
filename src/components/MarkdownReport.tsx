@@ -50,11 +50,52 @@ function splitIntoSections(markdown: string): { preamble: string; sections: Sect
   return { preamble: preamble.trimEnd(), sections };
 }
 
-const proseClasses =
-  "prose prose-invert max-w-none prose-headings:font-semibold prose-headings:tracking-tight prose-h3:text-base prose-h3:mt-8 prose-h3:mb-3 prose-p:text-muted-foreground prose-p:leading-[1.8] prose-p:text-[15px] prose-table:text-sm prose-th:text-left prose-th:font-medium prose-th:text-foreground prose-th:pb-2 prose-td:text-muted-foreground prose-td:py-2 prose-li:text-muted-foreground prose-li:leading-[1.8] prose-li:text-[15px] prose-strong:text-foreground prose-code:text-sm prose-code:bg-muted prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:font-mono prose-a:text-primary prose-a:underline-offset-2 prose-hr:border-border";
+const proseClasses = "report-prose max-w-none";
 
 const remarkPlugins = [remarkGfm];
 const rehypePlugins = [rehypeRaw, rehypeSlug];
+
+type TableEl = React.DetailedHTMLProps<React.TableHTMLAttributes<HTMLTableElement>, HTMLTableElement>;
+type THeadEl = React.DetailedHTMLProps<React.HTMLAttributes<HTMLTableSectionElement>, HTMLTableSectionElement>;
+type TBodyEl = React.DetailedHTMLProps<React.HTMLAttributes<HTMLTableSectionElement>, HTMLTableSectionElement>;
+type TrEl = React.DetailedHTMLProps<React.HTMLAttributes<HTMLTableRowElement>, HTMLTableRowElement>;
+type ThEl = React.DetailedHTMLProps<React.ThHTMLAttributes<HTMLTableCellElement>, HTMLTableCellElement>;
+type TdEl = React.DetailedHTMLProps<React.TdHTMLAttributes<HTMLTableCellElement>, HTMLTableCellElement>;
+
+const markdownComponents = {
+  table: ({ children, ...props }: TableEl) => (
+    <div className="report-table my-6 overflow-x-auto rounded-lg border border-border">
+      <table className="w-full text-sm border-collapse" {...props}>
+        {children}
+      </table>
+    </div>
+  ),
+  thead: ({ children, ...props }: THeadEl) => (
+    <thead className="bg-muted/60 border-b border-border" {...props}>
+      {children}
+    </thead>
+  ),
+  tbody: ({ children, ...props }: TBodyEl) => (
+    <tbody className="divide-y divide-border/50" {...props}>
+      {children}
+    </tbody>
+  ),
+  tr: ({ children, ...props }: TrEl) => (
+    <tr className="transition-colors hover:bg-muted/40 even:bg-muted/25" {...props}>
+      {children}
+    </tr>
+  ),
+  th: ({ children, ...props }: ThEl) => (
+    <th className="report-table-th" {...props}>
+      {children}
+    </th>
+  ),
+  td: ({ children, ...props }: TdEl) => (
+    <td className="report-table-td" {...props}>
+      {children}
+    </td>
+  ),
+};
 
 function CollapsibleSection({
   section,
@@ -104,7 +145,7 @@ function CollapsibleSection({
       {open && (
         <div className="px-6 pb-6 animate-fade-in">
           <article className={proseClasses}>
-            <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={rehypePlugins}>
+            <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={rehypePlugins} components={markdownComponents}>
               {section.body}
             </ReactMarkdown>
           </article>
@@ -247,7 +288,7 @@ export function MarkdownReport({
   if (sections.length === 0) {
     return (
       <article className={proseClasses}>
-        <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={rehypePlugins}>
+        <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={rehypePlugins} components={markdownComponents}>
           {processedContent}
         </ReactMarkdown>
       </article>
@@ -265,7 +306,7 @@ export function MarkdownReport({
         <div className="min-w-0 flex-1">
           {preamble && (
             <article className={`${proseClasses} mb-6`}>
-              <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={rehypePlugins}>
+              <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={rehypePlugins} components={markdownComponents}>
                 {preamble}
               </ReactMarkdown>
             </article>
