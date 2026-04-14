@@ -11,7 +11,14 @@ import { eq } from "drizzle-orm";
 import { put } from "@vercel/blob";
 import { getParser } from "@/lib/parsers";
 
+function isBlobLike(
+  v: unknown
+): v is Blob & { readonly name?: string } {
+  return typeof Blob !== "undefined" && v instanceof Blob;
+}
+
 export async function POST(req: NextRequest) {
+  try {
   const formData = await req.formData();
 
   const apiKey = req.headers.get("x-api-key") ?? formData.get("apiKey");
@@ -43,8 +50,8 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const reportFile = formData.get("report") as File | null;
-  if (!reportFile) {
+  const reportFile = formData.get("report");
+  if (!reportFile || !isBlobLike(reportFile)) {
     return NextResponse.json(
       { error: "report file is required" },
       { status: 400 }
@@ -52,6 +59,8 @@ export async function POST(req: NextRequest) {
   }
 
   const reportMarkdown = await reportFile.text();
+  const reportFilename =
+    reportFile instanceof File ? reportFile.name : "report.md";
 
   const parser = getParser(skillType);
   const parsed = parser
@@ -65,7 +74,7 @@ export async function POST(req: NextRequest) {
   const reportBlob = await put(
     `${project.name}/${skillType}/report-${Date.now()}.md`,
     reportMarkdown,
-    { access: "public", contentType: "text/markdown" }
+    { access: "public", contentType: "text/markdown", addRandomSuffix: true }
   );
 
   const [run] = await db
@@ -80,7 +89,7 @@ export async function POST(req: NextRequest) {
 
   await db.insert(artifactsTable).values({
     runId: run.id,
-    filename: reportFile.name || "report.md",
+    filename: reportFilename,
     mimeType: "text/markdown",
     blobUrl: reportBlob.url,
     role: "report",
@@ -113,52 +122,65 @@ export async function POST(req: NextRequest) {
   const uploadedScreenshots: string[] = [];
   const entries = Array.from(formData.entries());
   for (const [key, value] of entries) {
-    if (key.startsWith("screenshot:") && value instanceof File) {
+    if (key.startsWith("screenshot:") && isBlobLike(value)) {
+      const filename =
+        value instanceof File ? value.name : key.slice("screenshot:".length);
       const blob = await put(
-        `${project.name}/${skillType}/screenshots/${value.name}`,
+        `${project.name}/${skillType}/screenshots/${filename}`,
         value,
-        { access: "public", contentType: value.type || "image/png" }
+        {
+          access: "public",
+          contentType: value.type || "image/png",
+          addRandomSuffix: true,
+        }
       );
 
       await db.insert(artifactsTable).values({
         runId: run.id,
-        filename: value.name,
+        filename,
         mimeType: value.type || "image/png",
         blobUrl: blob.url,
         role: "screenshot",
       });
 
-      uploadedScreenshots.push(value.name);
+      uploadedScreenshots.push(filename);
     }
 
-    if (key.startsWith("config:") && value instanceof File) {
+    if (key.startsWith("config:") && isBlobLike(value)) {
+      const filename =
+        value instanceof File ? value.name : key.slice("config:".length);
       const configContent = await value.text();
       const blob = await put(
-        `${project.name}/${skillType}/configs/${value.name}`,
+        `${project.name}/${skillType}/configs/${filename}`,
         configContent,
-        { access: "public", contentType: "application/json" }
+        {
+          access: "public",
+          contentType: "application/json",
+          addRandomSuffix: true,
+        }
       );
 
       await db.insert(artifactsTable).values({
         runId: run.id,
-        filename: value.name,
+        filename,
         mimeType: "application/json",
         blobUrl: blob.url,
         role: "config",
       });
     }
 
-    if (key === "journeyMap" && value instanceof File) {
+    if (key === "journeyMap" && isBlobLike(value)) {
+      const filename = value instanceof File ? value.name : "journey-map.md";
       const mapContent = await value.text();
       const blob = await put(
         `${project.name}/${skillType}/journey-map-${Date.now()}.md`,
         mapContent,
-        { access: "public", contentType: "text/markdown" }
+        { access: "public", contentType: "text/markdown", addRandomSuffix: true }
       );
 
       await db.insert(artifactsTable).values({
         runId: run.id,
-        filename: value.name,
+        filename,
         mimeType: "text/markdown",
         blobUrl: blob.url,
         role: "journey-map",
@@ -178,4 +200,9 @@ export async function POST(req: NextRequest) {
     },
     { status: 201 }
   );
+  } catch (e) {
+    console.error("[POST /api/runs]", e);
+    const message = e instanceof Error ? e.message : String(e);
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 }

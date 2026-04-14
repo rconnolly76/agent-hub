@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { MarkdownReport } from "@/components/MarkdownReport";
+import { MarkdownSummary } from "@/components/MarkdownSummary";
 import { MetricsSidebar } from "@/components/MetricsSidebar";
 import { ScreenshotGallery } from "@/components/ScreenshotGallery";
 import type { Metadata } from "next";
@@ -137,20 +138,24 @@ export default async function RunDetailPage({
         </div>
       </div>
 
-      {run.executiveSummary && (
-        <div className="mb-10 max-w-2xl">
-          <p className="text-base text-foreground/80 leading-[1.8]">
-            {run.executiveSummary.replace(/\*\*/g, "")}
-          </p>
-        </div>
-      )}
-
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-8">
+        {run.executiveSummary && (
+          <div className="col-span-full mb-2">
+            <div className="rounded-lg border border-border bg-card/40 px-6 py-5">
+              <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
+                Executive Summary
+              </h2>
+              <MarkdownSummary content={run.executiveSummary} />
+            </div>
+          </div>
+        )}
+
         <div className="min-w-0">
           {reportContent ? (
             <MarkdownReport
               content={reportContent}
               screenshotUrls={screenshotUrls}
+              excludeSections={["Executive Summary"]}
             />
           ) : (
             <p className="text-muted-foreground">No report content available</p>

@@ -3,12 +3,7 @@ import { runs, metrics, findings } from "@/lib/db/schema";
 import { eq, sql, inArray } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-} from "@/components/ui/card";
+import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import type { Metadata } from "next";
@@ -132,6 +127,40 @@ export default async function ProjectDetailPage({
     findingsCount: findingsByRun.get(run.id) ?? 0,
   }));
 
+  const runsBySkill = new Map<string, RunWithStats[]>();
+  for (const run of runsWithStats) {
+    const bucket = runsBySkill.get(run.skillType) ?? [];
+    bucket.push(run);
+    runsBySkill.set(run.skillType, bucket);
+  }
+
+  const skillOrder: string[] = [];
+  const skillSeen = new Set<string>();
+  for (const run of runsWithStats) {
+    if (!skillSeen.has(run.skillType)) {
+      skillSeen.add(run.skillType);
+      skillOrder.push(run.skillType);
+    }
+  }
+
+  const skillGroups = skillOrder.map((skillType) => {
+    const bucket = runsBySkill.get(skillType)!;
+    return {
+      latest: bucket[0],
+      older: bucket.slice(1),
+    };
+  });
+
+  function formatRunDate(d: Date) {
+    return d.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+
   return (
     <div>
       <div className="mb-8">
@@ -193,10 +222,16 @@ export default async function ProjectDetailPage({
         </Card>
       ) : (
         <div className="space-y-4">
-          <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
-            Run History ({runsWithStats.length})
-          </h2>
-          {runsWithStats.map((run, i) => {
+          <div>
+            <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+              Run history
+            </h2>
+            <p className="text-xs text-muted-foreground/80 mt-1">
+              {skillGroups.length} skill{skillGroups.length !== 1 ? "s" : ""} ·{" "}
+              {runsWithStats.length} total run{runsWithStats.length !== 1 ? "s" : ""}
+            </p>
+          </div>
+          {skillGroups.map(({ latest: run, older }, i) => {
             const stepsCompleted = run.metrics.find(
               (m) => m.key === "steps_completed"
             );
@@ -208,50 +243,80 @@ export default async function ProjectDetailPage({
             );
 
             return (
-              <Link key={run.id} href={`/runs/${run.id}`} className={`animate-fade-in-up stagger-${Math.min(i + 1, 6)}`}>
-                <Card className="hover:border-foreground/20 hover:bg-card/80 hover:shadow-lg hover:shadow-black/5 transition-all duration-200 cursor-pointer mb-4">
-                  <CardHeader className="pb-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-center gap-3">
-                        <Badge variant="outline" className="font-mono text-xs">
-                          {formatSkillType(run.skillType)}
-                        </Badge>
-                        {getSeverityBadge(run)}
-                      </div>
-                      <span className="text-xs text-muted-foreground whitespace-nowrap">
-                        {run.createdAt.toLocaleDateString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </span>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    {run.executiveSummary && (
-                      <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
-                        {run.executiveSummary.replace(/\*\*/g, "").slice(0, 250)}
-                        {run.executiveSummary.length > 250 ? "..." : ""}
-                      </p>
-                    )}
-                    <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
-                      {stepsCompleted && stepsTotal && (
-                        <span>
-                          Steps: {stepsCompleted.value}/{stepsTotal.value}
+              <div
+                key={run.id}
+                className={`animate-fade-in-up stagger-${Math.min(i + 1, 6)}`}
+              >
+                <Card className="mb-4 overflow-hidden transition-colors hover:border-foreground/20">
+                  <Link
+                    href={`/runs/${run.id}`}
+                    className="block hover:bg-card/80 hover:shadow-lg hover:shadow-black/5 transition-all duration-200 cursor-pointer"
+                  >
+                    <CardHeader className="pb-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <Badge variant="outline" className="font-mono text-xs">
+                            {formatSkillType(run.skillType)}
+                          </Badge>
+                          {getSeverityBadge(run)}
+                        </div>
+                        <span className="text-xs text-muted-foreground whitespace-nowrap">
+                          {formatRunDate(run.createdAt)}
                         </span>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      {run.executiveSummary && (
+                        <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
+                          {run.executiveSummary.replace(/\*\*/g, "").slice(0, 250)}
+                          {run.executiveSummary.length > 250 ? "..." : ""}
+                        </p>
                       )}
-                      {heuristic && (
-                        <span>Heuristic coverage: {heuristic.value}%</span>
-                      )}
-                      {run.findingsCount > 0 && (
-                        <span>{run.findingsCount} findings</span>
-                      )}
+                      <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
+                        {stepsCompleted && stepsTotal && (
+                          <span>
+                            Steps: {stepsCompleted.value}/{stepsTotal.value}
+                          </span>
+                        )}
+                        {heuristic && (
+                          <span>Heuristic coverage: {heuristic.value}%</span>
+                        )}
+                        {run.findingsCount > 0 && (
+                          <span>{run.findingsCount} findings</span>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Link>
+                  {older.length > 0 && (
+                    <div className="border-t border-border px-6 py-3 bg-muted/20">
+                      <details>
+                        <summary className="text-xs text-muted-foreground cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+                          <span className="text-foreground/80">
+                            {older.length} earlier run
+                            {older.length !== 1 ? "s" : ""}
+                          </span>
+                        </summary>
+                        <ul className="mt-3 space-y-2 pl-0 list-none">
+                          {older.map((r) => (
+                            <li
+                              key={r.id}
+                              className="flex items-center justify-between gap-3 text-xs"
+                            >
+                              <Link
+                                href={`/runs/${r.id}`}
+                                className="text-muted-foreground hover:text-foreground underline-offset-2 hover:underline transition-colors"
+                              >
+                                {formatRunDate(r.createdAt)}
+                              </Link>
+                              {getSeverityBadge(r)}
+                            </li>
+                          ))}
+                        </ul>
+                      </details>
                     </div>
-                  </CardContent>
+                  )}
                 </Card>
-              </Link>
+              </div>
             );
           })}
         </div>

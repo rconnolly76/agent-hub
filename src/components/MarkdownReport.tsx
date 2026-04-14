@@ -9,6 +9,7 @@ import rehypeSlug from "rehype-slug";
 interface MarkdownReportProps {
   content: string;
   screenshotUrls: Record<string, string>;
+  excludeSections?: string[];
 }
 
 interface Section {
@@ -245,6 +246,7 @@ function TableOfContents({
 export function MarkdownReport({
   content,
   screenshotUrls,
+  excludeSections = [],
 }: MarkdownReportProps) {
   const [activeSlug, setActiveSlug] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -254,7 +256,11 @@ export function MarkdownReport({
     processedContent = processedContent.replaceAll(filename, url);
   }
 
-  const { preamble, sections } = splitIntoSections(processedContent);
+  const { preamble, sections: allSections } = splitIntoSections(processedContent);
+  const excludeNormalized = excludeSections.map((s) => s.toLowerCase());
+  const sections = allSections.filter(
+    (s) => !excludeNormalized.includes(s.title.toLowerCase()),
+  );
 
   const handleJump = useCallback((slug: string) => {
     const el = document.getElementById(slug);

@@ -65,6 +65,15 @@ function collectFiles(dir, extensions) {
   });
 }
 
+/**
+ * Markdown / JSON must use File (not Blob) so UTF-8 (smart quotes, emoji, CJK)
+ * serializes correctly in multipart. Blob + Unicode text can throw ByteString errors in Node fetch.
+ */
+function textFile(absPath, filename, mime) {
+  const buf = fs.readFileSync(absPath);
+  return new File([buf], filename, { type: mime });
+}
+
 async function push() {
   const cwd = process.cwd();
   const skillType = explicitSkill || detectSkillType(cwd);
@@ -93,18 +102,19 @@ async function push() {
       process.exit(1);
     }
 
-    const reportBlob = new Blob([fs.readFileSync(reportPath)], {
-      type: "text/markdown",
-    });
-    formData.append("report", reportBlob, "ux-journey-report.md");
+    formData.append(
+      "report",
+      textFile(reportPath, "ux-journey-report.md", "text/markdown"),
+    );
     console.log("  + report:  ux-journey-report.md");
 
     const screenshotsDir = path.join(cwd, "ux-journey-screenshots");
     const screenshots = collectFiles(screenshotsDir, [".png", ".jpg", ".jpeg", ".webp"]);
     for (const filename of screenshots) {
       const filePath = path.join(screenshotsDir, filename);
+      const ext = path.extname(filename).slice(1).toLowerCase();
       const fileBlob = new Blob([fs.readFileSync(filePath)], {
-        type: `image/${path.extname(filename).slice(1)}`,
+        type: `image/${ext}`,
       });
       formData.append(`screenshot:${filename}`, fileBlob, filename);
       console.log(`  + screenshot: ${filename}`);
@@ -114,19 +124,19 @@ async function push() {
     const configs = collectFiles(configsDir, [".json"]);
     for (const filename of configs) {
       const filePath = path.join(configsDir, filename);
-      const fileBlob = new Blob([fs.readFileSync(filePath)], {
-        type: "application/json",
-      });
-      formData.append(`config:${filename}`, fileBlob, filename);
+      formData.append(
+        `config:${filename}`,
+        textFile(filePath, filename, "application/json"),
+      );
       console.log(`  + config: ${filename}`);
     }
 
     const journeyMapPath = path.join(cwd, "ux-journeys.md");
     if (fs.existsSync(journeyMapPath)) {
-      const mapBlob = new Blob([fs.readFileSync(journeyMapPath)], {
-        type: "text/markdown",
-      });
-      formData.append("journeyMap", mapBlob, "ux-journeys.md");
+      formData.append(
+        "journeyMap",
+        textFile(journeyMapPath, "ux-journeys.md", "text/markdown"),
+      );
       console.log("  + journey-map: ux-journeys.md");
     }
   } else if (skillType === "ux-journey-discovery") {
@@ -135,21 +145,55 @@ async function push() {
       console.error("ux-journeys.md not found");
       process.exit(1);
     }
-    const mapBlob = new Blob([fs.readFileSync(mapPath)], {
-      type: "text/markdown",
-    });
-    formData.append("report", mapBlob, "ux-journeys.md");
+    formData.append(
+      "report",
+      textFile(mapPath, "ux-journeys.md", "text/markdown"),
+    );
     console.log("  + report: ux-journeys.md");
 
     const configsDir = path.join(cwd, "ux-journey-configs");
     const configs = collectFiles(configsDir, [".json"]);
     for (const filename of configs) {
       const filePath = path.join(configsDir, filename);
-      const fileBlob = new Blob([fs.readFileSync(filePath)], {
-        type: "application/json",
-      });
-      formData.append(`config:${filename}`, fileBlob, filename);
+      formData.append(
+        `config:${filename}`,
+        textFile(filePath, filename, "application/json"),
+      );
       console.log(`  + config: ${filename}`);
+    }
+  } else if (skillType === "ux-design-system-audit") {
+    const reportPath = path.join(cwd, "design-system-audit.md");
+    if (!fs.existsSync(reportPath)) {
+      console.error("design-system-audit.md not found");
+      process.exit(1);
+    }
+    formData.append(
+      "report",
+      textFile(reportPath, "design-system-audit.md", "text/markdown"),
+    );
+    console.log("  + report: design-system-audit.md");
+  } else if (skillType === "ux-visual-design-review") {
+    const reportPath = path.join(cwd, "visual-design-review.md");
+    if (!fs.existsSync(reportPath)) {
+      console.error("visual-design-review.md not found");
+      process.exit(1);
+    }
+    formData.append(
+      "report",
+      textFile(reportPath, "visual-design-review.md", "text/markdown"),
+    );
+    console.log("  + report: visual-design-review.md");
+
+    const screenshotsDir = path.join(cwd, "visual-review-screenshots");
+    const screenshots = collectFiles(screenshotsDir, [".png", ".jpg", ".jpeg", ".webp"]);
+    for (const filename of screenshots) {
+      const filePath = path.join(screenshotsDir, filename);
+      const ext = path.extname(filename).slice(1).toLowerCase();
+      const fileBlob = new Blob([fs.readFileSync(filePath)], {
+        type: `image/${ext}`,
+      });
+      formData.append(`screenshot:${filename}`, fileBlob, filename);
+      console.log(`  + screenshot: ${filename}`);
     }
   } else {
     console.error(
@@ -164,11 +208,11 @@ async function push() {
           !f.startsWith("CHANGELOG")
       );
     if (mdFiles.length > 0) {
-      const reportBlob = new Blob(
-        [fs.readFileSync(path.join(cwd, mdFiles[0]))],
-        { type: "text/markdown" }
+      const rp = path.join(cwd, mdFiles[0]);
+      formData.append(
+        "report",
+        textFile(rp, mdFiles[0], "text/markdown"),
       );
-      formData.append("report", reportBlob, mdFiles[0]);
       console.log(`  + report: ${mdFiles[0]}`);
     }
   }
