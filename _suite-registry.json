@@ -1,0 +1,97 @@
+{
+  "endpoint": null,
+  "defaultModel": null,
+  "autoPush": false,
+  "skills": {
+    "ux-journey-discovery": {
+      "phase": 1,
+      "type": "static",
+      "skill": "ux-journey-discovery",
+      "model": null,
+      "enabled": true,
+      "outputs": ["ux-journeys.md", "ux-journey-configs/"],
+      "dependsOn": []
+    },
+    "ux-design-system-audit": {
+      "phase": 1,
+      "type": "static",
+      "skill": "ux-design-system-audit",
+      "model": null,
+      "enabled": true,
+      "outputs": ["design-system-audit.md"],
+      "dependsOn": []
+    },
+    "code-quality-audit": {
+      "phase": 1,
+      "type": "static",
+      "skill": "code-quality-audit",
+      "model": null,
+      "enabled": true,
+      "outputs": ["code-quality-audit.md"],
+      "dependsOn": []
+    },
+    "web-security-audit": {
+      "phase": 1,
+      "type": "static",
+      "skill": "web-security-audit",
+      "model": null,
+      "enabled": true,
+      "outputs": ["web-security-audit.md"],
+      "dependsOn": []
+    },
+    "ux-journey-reviewer": {
+      "phase": 2,
+      "type": "browser",
+      "skill": "ux-journey-reviewer",
+      "model": null,
+      "enabled": true,
+      "outputs": ["ux-journey-report.md", "ux-journey-screenshots/"],
+      "dependsOn": ["ux-journey-discovery"]
+    },
+    "ux-visual-design-review": {
+      "phase": 2,
+      "type": "browser",
+      "skill": "ux-visual-design-review",
+      "model": null,
+      "enabled": true,
+      "outputs": ["visual-design-review.md", "visual-review-screenshots/"],
+      "dependsOn": []
+    },
+    "web-performance-audit": {
+      "phase": 2,
+      "type": "browser",
+      "skill": "web-performance-audit",
+      "model": null,
+      "enabled": true,
+      "outputs": ["web-performance-audit.md"],
+      "dependsOn": []
+    },
+    "product-marketer": {
+      "phase": 3,
+      "type": "generative",
+      "skill": "product-marketer",
+      "model": null,
+      "enabled": true,
+      "outputs": ["product-marketing/"],
+      "dependsOn": []
+    },
+    "product-docs-author": {
+      "phase": 3,
+      "type": "generative",
+      "skill": "product-docs-author",
+      "model": null,
+      "enabled": true,
+      "outputs": ["docs/"],
+      "dependsOn": []
+    },
+    "agent-hub-push": {
+      "phase": 4,
+      "type": "publish",
+      "skill": "agent-hub-push",
+      "model": null,
+      "enabled": true,
+      "outputs": [],
+      "dependsOn": []
+    }
+  }
+}

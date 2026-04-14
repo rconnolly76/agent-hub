@@ -323,7 +323,7 @@ export function MarkdownReport({
               <CollapsibleSection
                 key={`${section.slug}-${i}`}
                 section={section}
-                defaultOpen={i < 2}
+                defaultOpen
                 isActive={activeSlug === section.slug}
               />
             ))}

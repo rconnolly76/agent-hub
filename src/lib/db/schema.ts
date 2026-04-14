@@ -8,12 +8,15 @@ import {
   jsonb,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
+import type { SkillParserConfig } from "../parsers/types";
 
 export const projects = pgTable("projects", {
   id: uuid("id").defaultRandom().primaryKey(),
   name: text("name").notNull().unique(),
   repoUrl: text("repo_url"),
   apiKey: text("api_key").notNull(),
+  /** Maps ingest `skillType` → parser options (which parser id, generic fallback limits). */
+  skillParserConfig: jsonb("skill_parser_config").$type<SkillParserConfig | null>(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 

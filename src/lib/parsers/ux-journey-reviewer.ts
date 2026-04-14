@@ -1,3 +1,5 @@
+import { extractExecutiveSummarySection } from "./executive-summary";
+
 export interface ParsedMetric {
   key: string;
   value: number;
@@ -27,17 +29,10 @@ export interface ParseResult {
 
 export function parseJourneyReviewerReport(markdown: string): ParseResult {
   return {
-    executiveSummary: extractExecutiveSummary(markdown),
+    executiveSummary: extractExecutiveSummarySection(markdown),
     metrics: extractMetrics(markdown),
     findings: extractFindings(markdown),
   };
-}
-
-function extractExecutiveSummary(md: string): string {
-  const match = md.match(
-    /## Executive Summary\s*\n([\s\S]*?)(?=\n---|\n## )/
-  );
-  return match?.[1]?.trim() ?? "";
 }
 
 function extractMetrics(md: string): ParsedMetric[] {

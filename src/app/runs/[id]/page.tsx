@@ -3,11 +3,12 @@ import { artifacts, metrics, findings } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { Badge } from "@/components/ui/badge";
 import { MarkdownReport } from "@/components/MarkdownReport";
 import { MarkdownSummary } from "@/components/MarkdownSummary";
 import { MetricsSidebar } from "@/components/MetricsSidebar";
 import { ScreenshotGallery } from "@/components/ScreenshotGallery";
+import { ContentBundleSection } from "@/components/ContentBundleSection";
+import type { ContentBundleManifest } from "@/lib/parsers/content-bundle";
 import type { Metadata } from "next";
 
 export const dynamic = "force-dynamic";
@@ -91,6 +92,14 @@ export default async function RunDetailPage({
 
   const reportArtifact = runArtifacts.find((a) => a.role === "report");
   const screenshots = runArtifacts.filter((a) => a.role === "screenshot");
+  const contentArtifacts = runArtifacts.filter((a) => a.role === "content");
+
+  const rawMeta = run.rawMetadata as {
+    artifactType?: string;
+    manifest?: ContentBundleManifest;
+  } | null;
+  const isContentBundle =
+    rawMeta?.artifactType === "content-bundle" && rawMeta.manifest;
 
   let reportContent = "";
   if (reportArtifact) {
@@ -166,6 +175,18 @@ export default async function RunDetailPage({
               <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-4">Screenshots</h2>
               <ScreenshotGallery screenshots={screenshots} />
             </div>
+          )}
+
+          {isContentBundle &&
+            rawMeta.manifest &&
+            contentArtifacts.length > 0 && (
+            <ContentBundleSection
+              manifest={rawMeta.manifest}
+              contentArtifacts={contentArtifacts.map((a) => ({
+                filename: a.filename,
+                blobUrl: a.blobUrl,
+              }))}
+            />
           )}
         </div>
 

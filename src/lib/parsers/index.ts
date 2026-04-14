@@ -1,20 +1,10 @@
-import {
-  parseJourneyReviewerReport,
+export {
+  getParser,
+  getRegisteredParserIds,
   type ParseResult,
-} from "./ux-journey-reviewer";
-
-export type { ParseResult };
-
-const parsers: Record<string, (markdown: string) => ParseResult> = {
-  "ux-journey-reviewer": parseJourneyReviewerReport,
-};
-
-export function getParser(
-  skillType: string
-): ((markdown: string) => ParseResult) | null {
-  return parsers[skillType] ?? null;
-}
-
-export function getSupportedSkillTypes(): string[] {
-  return Object.keys(parsers);
-}
+} from "./registry";
+export type { SkillParserEntry, SkillParserConfig } from "./types";
+export { GENERIC_PARSER_ID } from "./types";
+export { parseSkillParserConfig, parseSkillParserOverride } from "./config";
+export { parseReportForIngest, parseGenericReport } from "./ingest";
+export { extractExecutiveSummarySection } from "./executive-summary";

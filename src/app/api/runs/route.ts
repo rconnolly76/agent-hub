@@ -9,7 +9,17 @@ import {
 } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { put } from "@vercel/blob";
-import { getParser } from "@/lib/parsers";
+import {
+  parseReportForIngest,
+  parseSkillParserOverride,
+  type SkillParserConfig,
+} from "@/lib/parsers";
+import {
+  buildSyntheticBundleReport,
+  parseContentBundleForIngest,
+  parseContentBundleManifestJson,
+  type ContentBundleManifest,
+} from "@/lib/parsers/content-bundle";
 
 function isBlobLike(
   v: unknown
@@ -19,36 +29,96 @@ function isBlobLike(
 
 export async function POST(req: NextRequest) {
   try {
-  const formData = await req.formData();
+    const formData = await req.formData();
 
-  const apiKey = req.headers.get("x-api-key") ?? formData.get("apiKey");
-  if (!apiKey || typeof apiKey !== "string") {
-    return NextResponse.json(
-      { error: "x-api-key header or apiKey field is required" },
-      { status: 401 }
-    );
+    const apiKey = req.headers.get("x-api-key") ?? formData.get("apiKey");
+    if (!apiKey || typeof apiKey !== "string") {
+      return NextResponse.json(
+        { error: "x-api-key header or apiKey field is required" },
+        { status: 401 }
+      );
+    }
+
+    const [project] = await db
+      .select()
+      .from(projects)
+      .where(eq(projects.apiKey, apiKey))
+      .limit(1);
+
+    if (!project) {
+      return NextResponse.json(
+        { error: "Invalid API key" },
+        { status: 401 }
+      );
+    }
+
+    const skillType = formData.get("skillType") as string;
+    if (!skillType) {
+      return NextResponse.json(
+        { error: "skillType is required" },
+        { status: 400 }
+      );
+    }
+
+    const artifactTypeRaw = formData.get("artifactType");
+    const isContentBundle =
+      typeof artifactTypeRaw === "string" &&
+      artifactTypeRaw.trim().toLowerCase() === "content-bundle";
+
+    const skillParserConfig = project.skillParserConfig as SkillParserConfig | null;
+
+    const overrideRaw = formData.get("skillParserOverride");
+    let override: ReturnType<typeof parseSkillParserOverride> | undefined;
+    if (typeof overrideRaw === "string" && overrideRaw.trim()) {
+      let parsedJson: unknown;
+      try {
+        parsedJson = JSON.parse(overrideRaw);
+      } catch {
+        return NextResponse.json(
+          { error: "skillParserOverride must be valid JSON" },
+          { status: 400 }
+        );
+      }
+      try {
+        override = parseSkillParserOverride(parsedJson);
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        return NextResponse.json({ error: message }, { status: 400 });
+      }
+    }
+
+    if (isContentBundle) {
+      return ingestContentBundle({
+        formData,
+        project,
+        skillType,
+        skillParserConfig,
+        override,
+      });
+    }
+
+    return ingestReportArtifact({
+      formData,
+      project,
+      skillType,
+      skillParserConfig,
+      override,
+    });
+  } catch (e) {
+    console.error("[POST /api/runs]", e);
+    const message = e instanceof Error ? e.message : String(e);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
+}
 
-  const [project] = await db
-    .select()
-    .from(projects)
-    .where(eq(projects.apiKey, apiKey))
-    .limit(1);
-
-  if (!project) {
-    return NextResponse.json(
-      { error: "Invalid API key" },
-      { status: 401 }
-    );
-  }
-
-  const skillType = formData.get("skillType") as string;
-  if (!skillType) {
-    return NextResponse.json(
-      { error: "skillType is required" },
-      { status: 400 }
-    );
-  }
+async function ingestReportArtifact(opts: {
+  formData: FormData;
+  project: typeof projects.$inferSelect;
+  skillType: string;
+  skillParserConfig: SkillParserConfig | null;
+  override: ReturnType<typeof parseSkillParserOverride> | undefined;
+}) {
+  const { formData, project, skillType, skillParserConfig, override } = opts;
 
   const reportFile = formData.get("report");
   if (!reportFile || !isBlobLike(reportFile)) {
@@ -62,14 +132,11 @@ export async function POST(req: NextRequest) {
   const reportFilename =
     reportFile instanceof File ? reportFile.name : "report.md";
 
-  const parser = getParser(skillType);
-  const parsed = parser
-    ? parser(reportMarkdown)
-    : {
-        executiveSummary: reportMarkdown.slice(0, 500),
-        metrics: [],
-        findings: [],
-      };
+  const parsed = parseReportForIngest(reportMarkdown, {
+    skillType,
+    skillParserConfig,
+    override,
+  });
 
   const reportBlob = await put(
     `${project.name}/${skillType}/report-${Date.now()}.md`,
@@ -84,6 +151,7 @@ export async function POST(req: NextRequest) {
       skillType,
       status: "completed",
       executiveSummary: parsed.executiveSummary,
+      rawMetadata: { artifactType: "report" as const },
     })
     .returning();
 
@@ -193,6 +261,7 @@ export async function POST(req: NextRequest) {
       id: run.id,
       projectId: project.id,
       skillType,
+      artifactType: "report",
       metrics: parsed.metrics.length,
       findings: parsed.findings.length,
       screenshots: uploadedScreenshots.length,
@@ -200,9 +269,175 @@ export async function POST(req: NextRequest) {
     },
     { status: 201 }
   );
-  } catch (e) {
-    console.error("[POST /api/runs]", e);
-    const message = e instanceof Error ? e.message : String(e);
-    return NextResponse.json({ error: message }, { status: 500 });
+}
+
+async function ingestContentBundle(opts: {
+  formData: FormData;
+  project: typeof projects.$inferSelect;
+  skillType: string;
+  skillParserConfig: SkillParserConfig | null;
+  override: ReturnType<typeof parseSkillParserOverride> | undefined;
+}) {
+  const { formData, project, skillType, skillParserConfig, override } = opts;
+
+  const manifestFile = formData.get("manifest");
+  if (!manifestFile || !isBlobLike(manifestFile)) {
+    return NextResponse.json(
+      { error: "manifest file is required for content-bundle ingest" },
+      { status: 400 }
+    );
   }
+
+  let manifest: ContentBundleManifest;
+  try {
+    const text = await manifestFile.text();
+    manifest = parseContentBundleManifestJson(text);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    return NextResponse.json(
+      { error: `Invalid manifest: ${message}` },
+      { status: 400 }
+    );
+  }
+
+  const auditField = formData.get("auditReport");
+  let auditMarkdown: string | null = null;
+  let auditFilename = "audit-report.md";
+  if (auditField && isBlobLike(auditField)) {
+    auditMarkdown = await auditField.text();
+    auditFilename =
+      auditField instanceof File ? auditField.name : auditFilename;
+  }
+
+  const parsed = parseContentBundleForIngest(manifest, auditMarkdown, {
+    skillType,
+    skillParserConfig,
+    override,
+  });
+
+  const manifestBlob = await put(
+    `${project.name}/${skillType}/bundle/manifest-${Date.now()}.json`,
+    JSON.stringify(manifest, null, 2),
+    { access: "public", contentType: "application/json", addRandomSuffix: true }
+  );
+
+  const [run] = await db
+    .insert(runs)
+    .values({
+      projectId: project.id,
+      skillType,
+      status: "completed",
+      executiveSummary: parsed.executiveSummary,
+      rawMetadata: {
+        artifactType: "content-bundle" as const,
+        manifest,
+        mode: manifest.mode ?? null,
+      },
+    })
+    .returning();
+
+  await db.insert(artifactsTable).values({
+    runId: run.id,
+    filename: "_manifest.json",
+    mimeType: "application/json",
+    blobUrl: manifestBlob.url,
+    role: "manifest",
+  });
+
+  let reportBody: string;
+  let reportName: string;
+  if (auditMarkdown?.trim()) {
+    reportBody = auditMarkdown;
+    reportName = auditFilename;
+  } else {
+    reportBody = buildSyntheticBundleReport(manifest);
+    reportName = "bundle-overview.md";
+  }
+
+  const reportBlob = await put(
+    `${project.name}/${skillType}/report-${Date.now()}.md`,
+    reportBody,
+    { access: "public", contentType: "text/markdown", addRandomSuffix: true }
+  );
+
+  await db.insert(artifactsTable).values({
+    runId: run.id,
+    filename: reportName,
+    mimeType: "text/markdown",
+    blobUrl: reportBlob.url,
+    role: "report",
+  });
+
+  const contentFiles: string[] = [];
+  const entries = Array.from(formData.entries());
+  for (const [key, value] of entries) {
+    if (!key.startsWith("content:") || !isBlobLike(value)) continue;
+    const relPath = key.slice("content:".length);
+    if (!relPath) continue;
+
+    const buf = await value.arrayBuffer();
+    const mime = value.type || "text/markdown";
+    const blob = await put(
+      `${project.name}/${skillType}/bundle/${relPath.replace(/^\//, "")}`,
+      buf,
+      { access: "public", contentType: mime, addRandomSuffix: true }
+    );
+
+    await db.insert(artifactsTable).values({
+      runId: run.id,
+      filename: relPath,
+      mimeType: mime,
+      blobUrl: blob.url,
+      role: "content",
+    });
+    contentFiles.push(relPath);
+  }
+
+  if (contentFiles.length === 0) {
+    return NextResponse.json(
+      {
+        error:
+          "content-bundle ingest requires at least one field like content:path/to/file.md",
+      },
+      { status: 400 }
+    );
+  }
+
+  if (parsed.metrics.length > 0) {
+    await db.insert(metricsTable).values(
+      parsed.metrics.map((m) => ({
+        runId: run.id,
+        key: m.key,
+        value: m.value,
+        unit: m.unit ?? null,
+      }))
+    );
+  }
+
+  if (parsed.findings.length > 0) {
+    await db.insert(findingsTable).values(
+      parsed.findings.map((f) => ({
+        runId: run.id,
+        severity: f.severity,
+        title: f.title,
+        description: f.description,
+        category: f.category,
+        recommendation: f.recommendation,
+      }))
+    );
+  }
+
+  return NextResponse.json(
+    {
+      id: run.id,
+      projectId: project.id,
+      skillType,
+      artifactType: "content-bundle",
+      metrics: parsed.metrics.length,
+      findings: parsed.findings.length,
+      contentFiles: contentFiles.length,
+      url: `/runs/${run.id}`,
+    },
+    { status: 201 }
+  );
 }
