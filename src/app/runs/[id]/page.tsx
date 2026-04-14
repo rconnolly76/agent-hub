@@ -112,12 +112,12 @@ export default async function RunDetailPage({
           {run.project.name}
         </Link>
         <div className="flex items-center gap-3 mt-3">
-          <h1 className="text-2xl font-semibold tracking-tight">Run Detail</h1>
+          <h1 className="text-xl font-semibold tracking-tight leading-none">Run Detail</h1>
           <Badge variant="outline" className="font-mono text-xs">
             {formatSkillType(run.skillType)}
           </Badge>
         </div>
-        <p className="text-sm text-muted-foreground mt-1">
+        <p className="text-[13px] text-muted-foreground mt-1.5">
           {run.createdAt.toLocaleDateString("en-US", {
             weekday: "long",
             month: "long",
@@ -131,11 +131,11 @@ export default async function RunDetailPage({
 
       {run.executiveSummary && (
         <div className="mb-8 rounded-lg border border-border bg-card/50 p-5">
-          <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
+          <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground/70 uppercase tracking-wider mb-3">
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/><line x1="10" x2="8" y1="9" y2="9"/></svg>
             Executive Summary
           </div>
-          <p className="text-sm text-muted-foreground leading-relaxed">
+          <p className="text-[13px] text-muted-foreground leading-relaxed">
             {run.executiveSummary.replace(/\*\*/g, "")}
           </p>
         </div>
@@ -154,7 +154,7 @@ export default async function RunDetailPage({
 
           {screenshots.length > 0 && (
             <div className="mt-8">
-              <h2 className="text-lg font-semibold mb-4">Screenshots</h2>
+              <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-4">Screenshots</h2>
               <ScreenshotGallery screenshots={screenshots} />
             </div>
           )}

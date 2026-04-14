@@ -50,7 +50,7 @@ export default function RootLayout({
                 <span className="flex items-center justify-center w-7 h-7 rounded-lg bg-foreground text-background text-xs font-bold">
                   A
                 </span>
-                <span className="text-lg">Agent Hub</span>
+                <span className="text-sm font-semibold">Agent Hub</span>
               </Link>
               <nav className="flex items-center gap-1 text-sm">
                 <Link

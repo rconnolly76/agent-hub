@@ -51,7 +51,7 @@ function splitIntoSections(markdown: string): { preamble: string; sections: Sect
 }
 
 const proseClasses =
-  "prose prose-invert prose-sm max-w-none prose-headings:font-semibold prose-headings:tracking-tight prose-h2:text-lg prose-h2:mt-0 prose-h2:mb-3 prose-h3:text-base prose-h3:mt-6 prose-h3:mb-2 prose-p:text-muted-foreground prose-p:leading-relaxed prose-table:text-xs prose-th:text-left prose-th:font-medium prose-th:text-foreground prose-td:text-muted-foreground prose-li:text-muted-foreground prose-strong:text-foreground prose-code:text-xs prose-code:bg-muted prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:font-mono prose-a:text-primary prose-hr:border-border";
+  "prose prose-invert prose-sm max-w-none prose-headings:font-semibold prose-headings:tracking-tight prose-h2:text-base prose-h2:mt-0 prose-h2:mb-3 prose-h3:text-sm prose-h3:mt-6 prose-h3:mb-2 prose-p:text-muted-foreground prose-p:leading-[1.7] prose-table:text-xs prose-th:text-left prose-th:font-medium prose-th:text-foreground prose-th:pb-2 prose-td:text-muted-foreground prose-td:py-1.5 prose-li:text-muted-foreground prose-li:leading-[1.7] prose-strong:text-foreground prose-code:text-xs prose-code:bg-muted prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:font-mono prose-a:text-primary prose-a:underline-offset-2 prose-hr:border-border";
 
 const remarkPlugins = [remarkGfm];
 const rehypePlugins = [rehypeRaw, rehypeSlug];
@@ -96,8 +96,8 @@ function CollapsibleSection({
           {section.title}
         </span>
         {!open && (
-          <span className="ml-auto text-[10px] text-muted-foreground/60 uppercase tracking-wider">
-            Click to expand
+          <span className="ml-auto text-xs text-muted-foreground/50 uppercase tracking-wider">
+            Expand
           </span>
         )}
       </button>
@@ -177,7 +177,7 @@ function TableOfContents({
   return (
     <nav className="hidden xl:block shrink-0 w-44">
       <div className="sticky top-[calc(3.5rem+2rem+1px)]">
-        <div className="text-[10px] font-medium text-muted-foreground/50 uppercase tracking-wider mb-3">
+        <div className="text-xs font-medium text-muted-foreground/50 uppercase tracking-wider mb-3">
           Sections
         </div>
         <ul className="space-y-0.5 border-l border-border pl-0">
@@ -185,7 +185,7 @@ function TableOfContents({
             <li key={`${s.slug}-${i}`}>
               <button
                 onClick={() => onJump(s.slug)}
-                className={`block w-full text-left text-[11px] leading-snug py-1.5 pl-3 -ml-px border-l-2 transition-colors ${
+                className={`block w-full text-left text-xs leading-snug py-1.5 pl-3 -ml-px border-l-2 transition-colors ${
                   activeSlug === s.slug
                     ? "text-foreground border-foreground font-medium"
                     : "text-muted-foreground border-transparent hover:text-foreground hover:border-muted-foreground/40"

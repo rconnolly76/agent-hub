@@ -8,11 +8,11 @@ export default function Error({
 }) {
   return (
     <div className="flex flex-col items-center justify-center py-32 text-center">
-      <div className="text-5xl mb-4">⚠</div>
-      <h1 className="text-xl font-semibold tracking-tight mb-2">
+      <div className="text-4xl mb-4">⚠</div>
+      <h1 className="text-base font-semibold tracking-tight mb-2">
         Something went wrong
       </h1>
-      <p className="text-sm text-muted-foreground mb-8 max-w-sm">
+      <p className="text-[13px] text-muted-foreground mb-8 max-w-sm leading-relaxed">
         An unexpected error occurred. This has been logged and we&apos;ll look
         into it.
       </p>

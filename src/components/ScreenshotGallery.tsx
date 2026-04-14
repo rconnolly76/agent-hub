@@ -61,7 +61,7 @@ export function ScreenshotGallery({
               sizes="(max-width: 768px) 50vw, 33vw"
             />
             <div className="absolute inset-x-0 bottom-0 bg-linear-to-t from-black/70 to-transparent p-2">
-              <span className="text-[10px] text-white/80 font-mono truncate block">
+              <span className="text-xs text-white/80 font-mono truncate block">
                 {s.filename}
               </span>
             </div>

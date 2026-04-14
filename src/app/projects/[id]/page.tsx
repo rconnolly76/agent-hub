@@ -157,18 +157,18 @@ export default async function ProjectDetailPage({
         </Link>
         <div className="flex items-center justify-between mt-3">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">
+            <h1 className="text-xl font-semibold tracking-tight leading-none">
               {project.name}
             </h1>
             {project.repoUrl && (
-              <p className="text-sm text-muted-foreground mt-1">
+              <p className="text-[13px] text-muted-foreground mt-1.5">
                 {project.repoUrl}
               </p>
             )}
           </div>
-          <div className="text-right text-sm text-muted-foreground">
-            <div>API Key</div>
-            <code className="text-xs bg-muted px-2 py-1 rounded font-mono">
+          <div className="text-right">
+            <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">API Key</div>
+            <code className="text-xs bg-muted px-2 py-1 rounded font-mono text-muted-foreground">
               {project.apiKey.slice(0, 8)}...
             </code>
           </div>
@@ -180,11 +180,11 @@ export default async function ProjectDetailPage({
       {runsWithStats.length === 0 ? (
         <Card>
           <CardContent className="py-16 text-center">
-            <div className="text-4xl mb-4 text-muted-foreground/30">📊</div>
-            <p className="text-muted-foreground mb-2">
+            <div className="text-3xl mb-4 text-muted-foreground/30">📊</div>
+            <p className="text-sm font-medium text-muted-foreground mb-1.5">
               No runs yet for this project
             </p>
-            <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
+            <p className="text-[13px] text-muted-foreground/70 mb-6 max-w-md mx-auto leading-relaxed">
               Push your first skill run using the CLI. Your API key is shown
               above.
             </p>
@@ -196,7 +196,7 @@ export default async function ProjectDetailPage({
         </Card>
       ) : (
         <div className="space-y-4">
-          <h2 className="text-lg font-medium">
+          <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
             Run History ({runsWithStats.length})
           </h2>
           {runsWithStats.map((run, i) => {

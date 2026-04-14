@@ -121,7 +121,7 @@ export function MetricsSidebar({
     <div className="space-y-4">
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium">Health</CardTitle>
+          <CardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Health</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="divide-y divide-border">
@@ -135,7 +135,7 @@ export function MetricsSidebar({
       {coverageMetrics.length > 0 && (
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Coverage</CardTitle>
+            <CardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Coverage</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="divide-y divide-border">
@@ -150,7 +150,7 @@ export function MetricsSidebar({
       {summaryMetrics.length > 0 && (
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Summary</CardTitle>
+            <CardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Summary</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="divide-y divide-border">
@@ -165,7 +165,7 @@ export function MetricsSidebar({
       {findings.length > 0 && (
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">
+            <CardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
               Findings ({findings.length})
             </CardTitle>
           </CardHeader>

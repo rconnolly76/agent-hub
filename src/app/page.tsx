@@ -166,8 +166,8 @@ export default async function HomePage() {
     <div>
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Projects</h1>
-          <p className="text-muted-foreground mt-1">
+          <h1 className="text-xl font-semibold tracking-tight leading-none">Projects</h1>
+          <p className="text-muted-foreground mt-1.5 text-[13px]">
             Agentic skill outputs across all your projects
           </p>
         </div>
