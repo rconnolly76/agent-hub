@@ -1,4 +1,5 @@
 import { extractExecutiveSummarySection } from "./executive-summary";
+import { buildRunDetailContractFromReport, type RunDetailContractV1 } from "@/lib/run-detail-contract";
 
 export interface ParsedMetric {
   key: string;
@@ -25,13 +26,21 @@ export interface ParseResult {
   executiveSummary: string;
   metrics: ParsedMetric[];
   findings: ParsedFinding[];
+  runDetail?: RunDetailContractV1;
 }
 
 export function parseJourneyReviewerReport(markdown: string): ParseResult {
+  const findings = extractFindings(markdown);
   return {
     executiveSummary: extractExecutiveSummarySection(markdown),
     metrics: extractMetrics(markdown),
-    findings: extractFindings(markdown),
+    findings,
+    runDetail:
+      buildRunDetailContractFromReport({
+        markdown,
+        artifactKind: "report",
+        findings,
+      }) ?? undefined,
   };
 }
 

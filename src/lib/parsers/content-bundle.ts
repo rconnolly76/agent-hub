@@ -1,6 +1,10 @@
 import type { ParseResult } from "./ux-journey-reviewer";
 import { parseReportForIngest } from "./ingest";
 import type { SkillParserConfig, SkillParserEntry } from "./types";
+import {
+  buildRunDetailContractFromBundleManifest,
+  buildRunDetailContractFromReport,
+} from "@/lib/run-detail-contract";
 
 /** Minimal manifest shape from generative skills (_manifest.json). */
 export interface ContentBundleManifest {
@@ -65,6 +69,7 @@ export function parseContentBundleForIngest(
     executiveSummary: manifest.summary,
     metrics: [],
     findings: [],
+    runDetail: buildRunDetailContractFromBundleManifest(manifest),
   };
 
   if (!auditMarkdown?.trim()) {
@@ -81,5 +86,15 @@ export function parseContentBundleForIngest(
     executiveSummary: base.executiveSummary || auditParsed.executiveSummary,
     metrics: auditParsed.metrics,
     findings: auditParsed.findings,
+    runDetail:
+      auditParsed.runDetail ??
+      (auditMarkdown
+        ? buildRunDetailContractFromReport({
+            markdown: auditMarkdown,
+            artifactKind: "content-bundle",
+            findings: auditParsed.findings,
+          })
+        : base.runDetail) ??
+      undefined,
   };
 }

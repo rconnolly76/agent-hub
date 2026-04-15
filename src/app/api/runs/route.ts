@@ -20,11 +20,36 @@ import {
   parseContentBundleManifestJson,
   type ContentBundleManifest,
 } from "@/lib/parsers/content-bundle";
+import { parseRunDetailContract } from "@/lib/run-detail-contract";
 
 function isBlobLike(
   v: unknown
 ): v is Blob & { readonly name?: string } {
   return typeof Blob !== "undefined" && v instanceof Blob;
+}
+
+function parseOptionalRunDetailContract(input: FormDataEntryValue | null) {
+  if (!input) return null;
+
+  let raw: unknown;
+  if (typeof input === "string") {
+    if (!input.trim()) return null;
+    try {
+      raw = JSON.parse(input);
+    } catch {
+      throw new Error("runDetailContract must be valid JSON");
+    }
+  } else if (isBlobLike(input)) {
+    throw new Error("runDetailContract must be sent as JSON string field");
+  } else {
+    throw new Error("runDetailContract must be valid JSON");
+  }
+
+  const parsed = parseRunDetailContract(raw);
+  if (!parsed) {
+    throw new Error("runDetailContract must match contract v1.0");
+  }
+  return parsed;
 }
 
 export async function POST(req: NextRequest) {
@@ -66,6 +91,16 @@ export async function POST(req: NextRequest) {
       artifactTypeRaw.trim().toLowerCase() === "content-bundle";
 
     const skillParserConfig = project.skillParserConfig as SkillParserConfig | null;
+  let providedRunDetailContract: ReturnType<typeof parseOptionalRunDetailContract> =
+    null;
+  try {
+    providedRunDetailContract = parseOptionalRunDetailContract(
+      formData.get("runDetailContract")
+    );
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    return NextResponse.json({ error: message }, { status: 400 });
+  }
 
     const overrideRaw = formData.get("skillParserOverride");
     let override: ReturnType<typeof parseSkillParserOverride> | undefined;
@@ -94,6 +129,7 @@ export async function POST(req: NextRequest) {
         skillType,
         skillParserConfig,
         override,
+        providedRunDetailContract,
       });
     }
 
@@ -103,6 +139,7 @@ export async function POST(req: NextRequest) {
       skillType,
       skillParserConfig,
       override,
+      providedRunDetailContract,
     });
   } catch (e) {
     console.error("[POST /api/runs]", e);
@@ -117,8 +154,16 @@ async function ingestReportArtifact(opts: {
   skillType: string;
   skillParserConfig: SkillParserConfig | null;
   override: ReturnType<typeof parseSkillParserOverride> | undefined;
+  providedRunDetailContract: ReturnType<typeof parseOptionalRunDetailContract>;
 }) {
-  const { formData, project, skillType, skillParserConfig, override } = opts;
+  const {
+    formData,
+    project,
+    skillType,
+    skillParserConfig,
+    override,
+    providedRunDetailContract,
+  } = opts;
 
   const reportFile = formData.get("report");
   if (!reportFile || !isBlobLike(reportFile)) {
@@ -151,7 +196,10 @@ async function ingestReportArtifact(opts: {
       skillType,
       status: "completed",
       executiveSummary: parsed.executiveSummary,
-      rawMetadata: { artifactType: "report" as const },
+      rawMetadata: {
+        artifactType: "report" as const,
+        runDetailContract: providedRunDetailContract ?? parsed.runDetail ?? null,
+      },
     })
     .returning();
 
@@ -277,8 +325,16 @@ async function ingestContentBundle(opts: {
   skillType: string;
   skillParserConfig: SkillParserConfig | null;
   override: ReturnType<typeof parseSkillParserOverride> | undefined;
+  providedRunDetailContract: ReturnType<typeof parseOptionalRunDetailContract>;
 }) {
-  const { formData, project, skillType, skillParserConfig, override } = opts;
+  const {
+    formData,
+    project,
+    skillType,
+    skillParserConfig,
+    override,
+    providedRunDetailContract,
+  } = opts;
 
   const manifestFile = formData.get("manifest");
   if (!manifestFile || !isBlobLike(manifestFile)) {
@@ -332,6 +388,7 @@ async function ingestContentBundle(opts: {
         artifactType: "content-bundle" as const,
         manifest,
         mode: manifest.mode ?? null,
+        runDetailContract: providedRunDetailContract ?? parsed.runDetail ?? null,
       },
     })
     .returning();

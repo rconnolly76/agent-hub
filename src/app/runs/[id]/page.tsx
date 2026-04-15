@@ -10,6 +10,11 @@ import { ScreenshotGallery } from "@/components/ScreenshotGallery";
 import { ContentBundleViewer } from "@/components/ContentBundleViewer";
 import type { ContentBundleManifest } from "@/lib/parsers/content-bundle";
 import type { Metadata } from "next";
+import {
+  buildRunDetailContractFromBundleManifest,
+  buildRunDetailContractFromReport,
+  parseRunDetailContract,
+} from "@/lib/run-detail-contract";
 
 export const dynamic = "force-dynamic";
 
@@ -124,6 +129,7 @@ export default async function RunDetailPage({
   const rawMeta = run.rawMetadata as {
     artifactType?: string;
     manifest?: ContentBundleManifest;
+    runDetailContract?: unknown;
   } | null;
   const isContentBundle =
     rawMeta?.artifactType === "content-bundle" && rawMeta.manifest;
@@ -161,6 +167,26 @@ export default async function RunDetailPage({
   const reportSections = reportContent
     ? extractReportSections(reportContent, ["Executive Summary"])
     : [];
+  const contractFromMetadata = parseRunDetailContract(
+    rawMeta?.runDetailContract ?? null
+  );
+  const derivedContractFromReport =
+    !contractFromMetadata && reportContent
+      ? buildRunDetailContractFromReport({
+          markdown: reportContent,
+          artifactKind: isContentBundle ? "content-bundle" : "report",
+          findings: runFindings,
+        })
+      : null;
+  const derivedContractFromManifest =
+    !contractFromMetadata &&
+    !derivedContractFromReport &&
+    isContentBundle &&
+    rawMeta?.manifest
+      ? buildRunDetailContractFromBundleManifest(rawMeta.manifest)
+      : null;
+  const effectiveRunDetailContract =
+    contractFromMetadata ?? derivedContractFromReport ?? derivedContractFromManifest;
 
   const statusTone =
     run.status === "completed"
@@ -341,6 +367,8 @@ export default async function RunDetailPage({
               metrics={runMetrics}
               findings={runFindings}
               skillType={run.skillType}
+              runDetailContract={effectiveRunDetailContract}
+              linkSections={Boolean(reportContent)}
             />
           </div>
         </aside>

@@ -1,6 +1,7 @@
 import { extractExecutiveSummarySection } from "./executive-summary";
 import { getParser } from "./registry";
 import type { ParseResult } from "./ux-journey-reviewer";
+import { buildRunDetailContractFromReport } from "@/lib/run-detail-contract";
 import {
   GENERIC_PARSER_ID,
   type SkillParserConfig,
@@ -19,6 +20,12 @@ export function parseGenericReport(
       markdown.slice(0, executiveSummaryFallbackMaxChars),
     metrics: [],
     findings: [],
+    runDetail:
+      buildRunDetailContractFromReport({
+        markdown,
+        artifactKind: "report",
+        findings: [],
+      }) ?? undefined,
   };
 }
 

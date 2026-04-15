@@ -9,7 +9,7 @@
       "skill": "ux-journey-discovery",
       "model": null,
       "enabled": true,
-      "outputs": ["ux-journeys.md", "ux-journey-configs/"],
+      "outputs": ["ux-journeys.md", "ux-journey-configs/", "_run-detail-contract.json"],
       "dependsOn": []
     },
     "ux-design-system-audit": {
@@ -18,7 +18,7 @@
       "skill": "ux-design-system-audit",
       "model": null,
       "enabled": true,
-      "outputs": ["design-system-audit.md"],
+      "outputs": ["design-system-audit.md", "_run-detail-contract.json"],
       "dependsOn": []
     },
     "code-quality-audit": {
@@ -27,7 +27,7 @@
       "skill": "code-quality-audit",
       "model": null,
       "enabled": true,
-      "outputs": ["code-quality-audit.md"],
+      "outputs": ["code-quality-audit.md", "_run-detail-contract.json"],
       "dependsOn": []
     },
     "web-security-audit": {
@@ -36,7 +36,7 @@
       "skill": "web-security-audit",
       "model": null,
       "enabled": true,
-      "outputs": ["web-security-audit.md"],
+      "outputs": ["web-security-audit.md", "_run-detail-contract.json"],
       "dependsOn": []
     },
     "ux-journey-reviewer": {
@@ -45,7 +45,7 @@
       "skill": "ux-journey-reviewer",
       "model": null,
       "enabled": true,
-      "outputs": ["ux-journey-report.md", "ux-journey-screenshots/"],
+      "outputs": ["ux-journey-report.md", "ux-journey-screenshots/", "_run-detail-contract.json"],
       "dependsOn": ["ux-journey-discovery"]
     },
     "ux-visual-design-review": {
@@ -54,7 +54,7 @@
       "skill": "ux-visual-design-review",
       "model": null,
       "enabled": true,
-      "outputs": ["visual-design-review.md", "visual-review-screenshots/"],
+      "outputs": ["visual-design-review.md", "visual-review-screenshots/", "_run-detail-contract.json"],
       "dependsOn": []
     },
     "web-performance-audit": {
@@ -63,7 +63,7 @@
       "skill": "web-performance-audit",
       "model": null,
       "enabled": true,
-      "outputs": ["web-performance-audit.md"],
+      "outputs": ["web-performance-audit.md", "_run-detail-contract.json"],
       "dependsOn": []
     },
     "product-marketer": {
@@ -72,7 +72,7 @@
       "skill": "product-marketer",
       "model": null,
       "enabled": true,
-      "outputs": ["product-marketing/"],
+      "outputs": ["product-marketing/", "product-marketing/_run-detail-contract.json"],
       "dependsOn": []
     },
     "product-docs-author": {
@@ -81,7 +81,7 @@
       "skill": "product-docs-author",
       "model": null,
       "enabled": true,
-      "outputs": ["docs/"],
+      "outputs": ["docs/", "docs/_run-detail-contract.json"],
       "dependsOn": []
     },
     "agent-hub-push": {

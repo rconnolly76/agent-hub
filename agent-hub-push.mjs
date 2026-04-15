@@ -7,6 +7,8 @@
  *   node agent-hub-push.mjs --endpoint https://agent-hub.vercel.app --key sk_xxx
  *   node agent-hub-push.mjs --endpoint http://localhost:3000 --key sk_xxx --project my-app --skill ux-journey-reviewer
  *   node agent-hub-push.mjs ... --content-dir product-marketing --skill product-marketer
+ *
+ * Optional: include `_run-detail-contract.json` to enrich Run Detail right-rail section health.
  */
 
 import fs from "node:fs";
@@ -110,6 +112,26 @@ function textFile(absPath, filename, mime) {
 }
 
 /**
+ * Optional sidecar contract for richer Run Detail rendering.
+ * If present, it is sent as JSON text field `runDetailContract`.
+ */
+function appendRunDetailContractIfPresent(formData, absPath) {
+  if (!fs.existsSync(absPath)) return false;
+  try {
+    const text = fs.readFileSync(absPath, "utf-8");
+    JSON.parse(text);
+    formData.append("runDetailContract", text);
+    console.log(`  + runDetailContract: ${path.relative(process.cwd(), absPath)}`);
+    return true;
+  } catch (e) {
+    console.warn(
+      `  ! invalid run detail contract JSON at ${path.relative(process.cwd(), absPath)}: ${e.message}`
+    );
+    return false;
+  }
+}
+
+/**
  * @param {FormData} formData
  * @param {string} relDir relative to cwd (e.g. product-marketing)
  * @param {string} cwd
@@ -143,6 +165,11 @@ function appendContentBundle(formData, relDir, cwd) {
       console.log(`  + auditReport: ${manifest.auditReport}`);
     }
   }
+
+  appendRunDetailContractIfPresent(
+    formData,
+    path.join(abs, "_run-detail-contract.json")
+  );
 
   let added = 0;
   for (const f of manifest.files || []) {
@@ -237,6 +264,11 @@ async function push() {
       formData.append("skillParserOverride", parserOverrideRaw);
       console.log(`  + skillParserOverride: ${parserOverrideRaw}`);
     }
+
+    appendRunDetailContractIfPresent(
+      formData,
+      path.join(cwd, "_run-detail-contract.json")
+    );
 
     const bundleDir = BUNDLE_DIRS[skillType];
     if (bundleDir) {
