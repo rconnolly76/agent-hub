@@ -15,6 +15,7 @@ import {
   buildRunDetailContractFromReport,
   parseRunDetailContract,
 } from "@/lib/run-detail-contract";
+import { parseTopRecommendationsPayload } from "@/lib/top-recommendations";
 
 export const dynamic = "force-dynamic";
 
@@ -130,6 +131,7 @@ export default async function RunDetailPage({
     artifactType?: string;
     manifest?: ContentBundleManifest;
     runDetailContract?: unknown;
+    topRecommendations?: unknown;
   } | null;
   const isContentBundle =
     rawMeta?.artifactType === "content-bundle" && rawMeta.manifest;
@@ -187,6 +189,8 @@ export default async function RunDetailPage({
       : null;
   const effectiveRunDetailContract =
     contractFromMetadata ?? derivedContractFromReport ?? derivedContractFromManifest;
+  const topRecommendations =
+    parseTopRecommendationsPayload(rawMeta?.topRecommendations ?? null)?.recommendations ?? [];
 
   const statusTone =
     run.status === "completed"
@@ -271,6 +275,11 @@ export default async function RunDetailPage({
                   Executive Summary
                 </a>
               )}
+              {topRecommendations.length > 0 && (
+                <a href="#top-recommendations" className="block text-muted-foreground hover:text-foreground transition-colors">
+                  Top Recommendations
+                </a>
+              )}
               {isContentBundle && contentFileData.length > 0 && (
                 <a href="#content-bundle" className="block text-muted-foreground hover:text-foreground transition-colors">
                   Content Bundle
@@ -326,6 +335,30 @@ export default async function RunDetailPage({
                 </div>
               </div>
               <MarkdownSummary content={run.executiveSummary} />
+            </section>
+          )}
+
+          {topRecommendations.length > 0 && (
+            <section id="top-recommendations" className="rounded-lg border border-border bg-card/40 px-6 py-5">
+              <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
+                Top 5 Recommendations
+              </h2>
+              <div className="space-y-2">
+                {topRecommendations.map((item) => (
+                  <div key={item.priority} className="rounded-md border border-border bg-background/60 p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-sm font-medium text-foreground">{item.title}</p>
+                      <span className="text-[10px] uppercase tracking-wider text-muted-foreground border border-border rounded px-1.5 py-0.5">
+                        {item.priority}
+                      </span>
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-1">{item.action}</p>
+                    {item.rationale && (
+                      <p className="text-xs text-muted-foreground/80 mt-1.5">{item.rationale}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
             </section>
           )}
 
