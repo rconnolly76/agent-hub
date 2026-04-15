@@ -14,6 +14,11 @@ import {
   parseSkillParserOverride,
   type SkillParserConfig,
 } from "@/lib/parsers";
+import { ensureExecutiveSummaryWithNextSteps } from "@/lib/parsers/executive-summary";
+import {
+  buildTopRecommendationsFromFindings,
+  parseTopRecommendationsPayload,
+} from "@/lib/top-recommendations";
 import {
   buildSyntheticBundleReport,
   parseContentBundleForIngest,
@@ -48,6 +53,28 @@ function parseOptionalRunDetailContract(input: FormDataEntryValue | null) {
   const parsed = parseRunDetailContract(raw);
   if (!parsed) {
     throw new Error("runDetailContract must match contract v1.0");
+  }
+  return parsed;
+}
+
+function parseOptionalTopRecommendations(input: FormDataEntryValue | null) {
+  if (!input) return null;
+
+  if (typeof input !== "string") {
+    throw new Error("topRecommendations must be sent as JSON string field");
+  }
+  if (!input.trim()) return null;
+
+  let raw: unknown;
+  try {
+    raw = JSON.parse(input);
+  } catch {
+    throw new Error("topRecommendations must be valid JSON");
+  }
+
+  const parsed = parseTopRecommendationsPayload(raw);
+  if (!parsed) {
+    throw new Error("topRecommendations must match payload v1.0");
   }
   return parsed;
 }
@@ -91,16 +118,27 @@ export async function POST(req: NextRequest) {
       artifactTypeRaw.trim().toLowerCase() === "content-bundle";
 
     const skillParserConfig = project.skillParserConfig as SkillParserConfig | null;
-  let providedRunDetailContract: ReturnType<typeof parseOptionalRunDetailContract> =
-    null;
-  try {
-    providedRunDetailContract = parseOptionalRunDetailContract(
-      formData.get("runDetailContract")
-    );
-  } catch (e) {
-    const message = e instanceof Error ? e.message : String(e);
-    return NextResponse.json({ error: message }, { status: 400 });
-  }
+    let providedRunDetailContract: ReturnType<typeof parseOptionalRunDetailContract> =
+      null;
+    try {
+      providedRunDetailContract = parseOptionalRunDetailContract(
+        formData.get("runDetailContract")
+      );
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      return NextResponse.json({ error: message }, { status: 400 });
+    }
+
+    let providedTopRecommendations: ReturnType<typeof parseOptionalTopRecommendations> =
+      null;
+    try {
+      providedTopRecommendations = parseOptionalTopRecommendations(
+        formData.get("topRecommendations")
+      );
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      return NextResponse.json({ error: message }, { status: 400 });
+    }
 
     const overrideRaw = formData.get("skillParserOverride");
     let override: ReturnType<typeof parseSkillParserOverride> | undefined;
@@ -130,6 +168,7 @@ export async function POST(req: NextRequest) {
         skillParserConfig,
         override,
         providedRunDetailContract,
+        providedTopRecommendations,
       });
     }
 
@@ -140,6 +179,7 @@ export async function POST(req: NextRequest) {
       skillParserConfig,
       override,
       providedRunDetailContract,
+      providedTopRecommendations,
     });
   } catch (e) {
     console.error("[POST /api/runs]", e);
@@ -155,6 +195,7 @@ async function ingestReportArtifact(opts: {
   skillParserConfig: SkillParserConfig | null;
   override: ReturnType<typeof parseSkillParserOverride> | undefined;
   providedRunDetailContract: ReturnType<typeof parseOptionalRunDetailContract>;
+  providedTopRecommendations: ReturnType<typeof parseOptionalTopRecommendations>;
 }) {
   const {
     formData,
@@ -163,6 +204,7 @@ async function ingestReportArtifact(opts: {
     skillParserConfig,
     override,
     providedRunDetailContract,
+    providedTopRecommendations,
   } = opts;
 
   const reportFile = formData.get("report");
@@ -182,6 +224,23 @@ async function ingestReportArtifact(opts: {
     skillParserConfig,
     override,
   });
+  const topRecommendations =
+    providedTopRecommendations ??
+    buildTopRecommendationsFromFindings({
+      skillType,
+      findings: parsed.findings,
+      metrics: parsed.metrics,
+    });
+
+  const executiveSummary = ensureExecutiveSummaryWithNextSteps(
+    parsed.executiveSummary,
+    {
+      skillType,
+      findings: parsed.findings,
+      metrics: parsed.metrics,
+      topRecommendations: topRecommendations.recommendations,
+    }
+  );
 
   const reportBlob = await put(
     `${project.name}/${skillType}/report-${Date.now()}.md`,
@@ -195,10 +254,11 @@ async function ingestReportArtifact(opts: {
       projectId: project.id,
       skillType,
       status: "completed",
-      executiveSummary: parsed.executiveSummary,
+      executiveSummary,
       rawMetadata: {
         artifactType: "report" as const,
         runDetailContract: providedRunDetailContract ?? parsed.runDetail ?? null,
+        topRecommendations,
       },
     })
     .returning();
@@ -326,6 +386,7 @@ async function ingestContentBundle(opts: {
   skillParserConfig: SkillParserConfig | null;
   override: ReturnType<typeof parseSkillParserOverride> | undefined;
   providedRunDetailContract: ReturnType<typeof parseOptionalRunDetailContract>;
+  providedTopRecommendations: ReturnType<typeof parseOptionalTopRecommendations>;
 }) {
   const {
     formData,
@@ -334,6 +395,7 @@ async function ingestContentBundle(opts: {
     skillParserConfig,
     override,
     providedRunDetailContract,
+    providedTopRecommendations,
   } = opts;
 
   const manifestFile = formData.get("manifest");
@@ -370,6 +432,23 @@ async function ingestContentBundle(opts: {
     skillParserConfig,
     override,
   });
+  const effectiveSkillType = manifest.skillType?.trim() || skillType;
+  const topRecommendations =
+    providedTopRecommendations ??
+    buildTopRecommendationsFromFindings({
+      skillType: effectiveSkillType,
+      findings: parsed.findings,
+      metrics: parsed.metrics,
+    });
+  const executiveSummary = ensureExecutiveSummaryWithNextSteps(
+    parsed.executiveSummary,
+    {
+      skillType: effectiveSkillType,
+      findings: parsed.findings,
+      metrics: parsed.metrics,
+      topRecommendations: topRecommendations.recommendations,
+    }
+  );
 
   const manifestBlob = await put(
     `${project.name}/${skillType}/bundle/manifest-${Date.now()}.json`,
@@ -383,12 +462,13 @@ async function ingestContentBundle(opts: {
       projectId: project.id,
       skillType,
       status: "completed",
-      executiveSummary: parsed.executiveSummary,
+      executiveSummary,
       rawMetadata: {
         artifactType: "content-bundle" as const,
         manifest,
         mode: manifest.mode ?? null,
         runDetailContract: providedRunDetailContract ?? parsed.runDetail ?? null,
+        topRecommendations,
       },
     })
     .returning();

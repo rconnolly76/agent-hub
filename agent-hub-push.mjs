@@ -27,6 +27,7 @@ const explicitSkill = getArg("skill");
 const explicitProject = getArg("project");
 const parserOverrideRaw = getArg("parser-override");
 const contentDirArg = getArg("content-dir");
+const TOP_RECOMMENDATIONS_FILENAME = "_top-5-recommendations.json";
 
 if (!endpoint || !apiKey) {
   console.error(
@@ -131,6 +132,102 @@ function appendRunDetailContractIfPresent(formData, absPath) {
   }
 }
 
+function extractRecommendationsSection(markdown) {
+  const match = markdown.match(/## Recommendations\s*\n([\s\S]*?)(?=\n## |\n---|$)/);
+  return match?.[1]?.trim() ?? "";
+}
+
+function buildTopRecommendationsPayload(skillType, markdown) {
+  const section = extractRecommendationsSection(markdown);
+  const recommendations = [];
+  const seen = new Set();
+
+  const emphasisMatches = section.match(/\*\*([^*]+)\*\*/g) || [];
+  for (const token of emphasisMatches) {
+    const clean = token.replace(/\*\*/g, "").trim();
+    if (!clean || seen.has(clean.toLowerCase())) continue;
+    seen.add(clean.toLowerCase());
+    recommendations.push({
+      priority: `P${Math.min(recommendations.length + 1, 5)}`,
+      title: clean,
+      action: clean,
+    });
+    if (recommendations.length === 5) break;
+  }
+
+  const bulletMatches = section.match(/^\s*[-*]\s+(.+)$/gm) || [];
+  for (const bullet of bulletMatches) {
+    if (recommendations.length === 5) break;
+    const clean = bullet.replace(/^\s*[-*]\s+/, "").replace(/\*\*/g, "").trim();
+    if (!clean || seen.has(clean.toLowerCase())) continue;
+    seen.add(clean.toLowerCase());
+    recommendations.push({
+      priority: `P${Math.min(recommendations.length + 1, 5)}`,
+      title: clean.slice(0, 120),
+      action: clean,
+    });
+  }
+
+  while (recommendations.length < 5) {
+    const idx = recommendations.length + 1;
+    recommendations.push({
+      priority: `P${idx}`,
+      title: `Follow-up improvement ${idx}`,
+      action: `Prioritize and execute follow-up improvement ${idx} for ${skillType}, then validate with a rerun.`,
+    });
+  }
+
+  return {
+    version: "1.0",
+    skillType,
+    generatedAt: new Date().toISOString(),
+    recommendations: recommendations.slice(0, 5),
+  };
+}
+
+function appendTopRecommendationsFromFile(formData, absPath) {
+  if (!fs.existsSync(absPath)) return false;
+  try {
+    const text = fs.readFileSync(absPath, "utf-8");
+    const parsed = JSON.parse(text);
+    if (!parsed || parsed.version !== "1.0" || !Array.isArray(parsed.recommendations)) {
+      throw new Error("invalid top recommendations payload");
+    }
+    formData.append("topRecommendations", JSON.stringify(parsed));
+    console.log(`  + topRecommendations: ${path.relative(process.cwd(), absPath)}`);
+    return true;
+  } catch (e) {
+    console.warn(
+      `  ! invalid top recommendations JSON at ${path.relative(process.cwd(), absPath)}: ${e.message}`
+    );
+    return false;
+  }
+}
+
+function ensureTopRecommendationsForReport({
+  formData,
+  cwd,
+  skillType,
+  reportPath,
+  preferredOutputDir = null,
+}) {
+  const outputDir = preferredOutputDir || cwd;
+  const sidecarPath = path.join(outputDir, TOP_RECOMMENDATIONS_FILENAME);
+  if (appendTopRecommendationsFromFile(formData, sidecarPath)) {
+    return;
+  }
+
+  try {
+    const markdown = fs.readFileSync(reportPath, "utf-8");
+    const payload = buildTopRecommendationsPayload(skillType, markdown);
+    fs.writeFileSync(sidecarPath, `${JSON.stringify(payload, null, 2)}\n`, "utf-8");
+    formData.append("topRecommendations", JSON.stringify(payload));
+    console.log(`  + topRecommendations (generated): ${path.relative(process.cwd(), sidecarPath)}`);
+  } catch (e) {
+    console.warn(`  ! could not generate top recommendations: ${e.message}`);
+  }
+}
+
 /**
  * @param {FormData} formData
  * @param {string} relDir relative to cwd (e.g. product-marketing)
@@ -170,6 +267,56 @@ function appendContentBundle(formData, relDir, cwd) {
     formData,
     path.join(abs, "_run-detail-contract.json")
   );
+
+  if (manifest.auditReport) {
+    const auditPath = path.join(abs, manifest.auditReport);
+    if (fs.existsSync(auditPath)) {
+      ensureTopRecommendationsForReport({
+        formData,
+        cwd,
+        skillType: manifest.skillType || "content-bundle",
+        reportPath: auditPath,
+        preferredOutputDir: abs,
+      });
+    }
+  } else if (!appendTopRecommendationsFromFile(formData, path.join(abs, TOP_RECOMMENDATIONS_FILENAME))) {
+    const payload = {
+      version: "1.0",
+      skillType: manifest.skillType || "content-bundle",
+      generatedAt: new Date().toISOString(),
+      recommendations: [
+        {
+          priority: "P1",
+          title: "Review generated bundle for critical accuracy",
+          action: "Validate factual correctness and remove high-risk claims before publication.",
+        },
+        {
+          priority: "P2",
+          title: "Align content with target audience intent",
+          action: "Adjust tone and structure for the primary persona and use case.",
+        },
+        {
+          priority: "P3",
+          title: "Normalize style and voice across files",
+          action: "Apply a consistent voice, terminology, and structure across generated assets.",
+        },
+        {
+          priority: "P4",
+          title: "Close content gaps",
+          action: "Add missing FAQs, edge cases, and guidance based on observed user questions.",
+        },
+        {
+          priority: "P5",
+          title: "Ship and measure impact",
+          action: "Publish changes and track engagement/feedback before next iteration.",
+        },
+      ],
+    };
+    const sidecarPath = path.join(abs, TOP_RECOMMENDATIONS_FILENAME);
+    fs.writeFileSync(sidecarPath, `${JSON.stringify(payload, null, 2)}\n`, "utf-8");
+    formData.append("topRecommendations", JSON.stringify(payload));
+    console.log(`  + topRecommendations (generated): ${path.relative(process.cwd(), sidecarPath)}`);
+  }
 
   let added = 0;
   for (const f of manifest.files || []) {
@@ -285,6 +432,12 @@ async function push() {
         textFile(reportPath, "ux-journey-report.md", "text/markdown")
       );
       console.log("  + report:  ux-journey-report.md");
+      ensureTopRecommendationsForReport({
+        formData,
+        cwd,
+        skillType,
+        reportPath,
+      });
 
       const screenshotsDir = path.join(cwd, "ux-journey-screenshots");
       const screenshots = collectFiles(screenshotsDir, [
@@ -333,6 +486,12 @@ async function push() {
         textFile(mapPath, "ux-journeys.md", "text/markdown")
       );
       console.log("  + report: ux-journeys.md");
+      ensureTopRecommendationsForReport({
+        formData,
+        cwd,
+        skillType,
+        reportPath: mapPath,
+      });
 
       const configsDir = path.join(cwd, "ux-journey-configs");
       const configs = collectFiles(configsDir, [".json"]);
@@ -355,6 +514,12 @@ async function push() {
         textFile(reportPath, "design-system-audit.md", "text/markdown")
       );
       console.log("  + report: design-system-audit.md");
+      ensureTopRecommendationsForReport({
+        formData,
+        cwd,
+        skillType,
+        reportPath,
+      });
     } else if (skillType === "ux-visual-design-review") {
       const reportPath = path.join(cwd, "visual-design-review.md");
       if (!fs.existsSync(reportPath)) {
@@ -366,6 +531,12 @@ async function push() {
         textFile(reportPath, "visual-design-review.md", "text/markdown")
       );
       console.log("  + report: visual-design-review.md");
+      ensureTopRecommendationsForReport({
+        formData,
+        cwd,
+        skillType,
+        reportPath,
+      });
 
       const screenshotsDir = path.join(cwd, "visual-review-screenshots");
       const screenshots = collectFiles(screenshotsDir, [
@@ -399,6 +570,12 @@ async function push() {
         textFile(reportPath, fileName, "text/markdown")
       );
       console.log(`  + report: ${fileName}`);
+      ensureTopRecommendationsForReport({
+        formData,
+        cwd,
+        skillType,
+        reportPath,
+      });
     } else {
       console.error(
         `Skill type '${skillType}' is not recognized. Use --skill with a known type or --content-dir for bundles.`

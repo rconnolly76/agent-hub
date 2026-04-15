@@ -11,6 +11,8 @@ export interface SkillCatalogEntry {
   reportFile?: string;
   /** Optional run detail contract sidecar for richer FE rendering. */
   runDetailContractFile?: string;
+  /** Optional top recommendations sidecar consumed by ingest. */
+  topRecommendationsFile?: string;
   screenshotDir?: string;
   configDir?: string;
   /** Generative: directory containing _manifest.json */
@@ -23,6 +25,7 @@ export const SKILL_CATALOG: SkillCatalogEntry[] = [
     kind: "report",
     reportFile: "ux-journeys.md",
     runDetailContractFile: "_run-detail-contract.json",
+    topRecommendationsFile: "_top-5-recommendations.json",
     configDir: "ux-journey-configs",
   },
   {
@@ -30,12 +33,14 @@ export const SKILL_CATALOG: SkillCatalogEntry[] = [
     kind: "report",
     reportFile: "design-system-audit.md",
     runDetailContractFile: "_run-detail-contract.json",
+    topRecommendationsFile: "_top-5-recommendations.json",
   },
   {
     skill: "ux-journey-reviewer",
     kind: "report",
     reportFile: "ux-journey-report.md",
     runDetailContractFile: "_run-detail-contract.json",
+    topRecommendationsFile: "_top-5-recommendations.json",
     screenshotDir: "ux-journey-screenshots",
     configDir: "ux-journey-configs",
   },
@@ -44,6 +49,7 @@ export const SKILL_CATALOG: SkillCatalogEntry[] = [
     kind: "report",
     reportFile: "visual-design-review.md",
     runDetailContractFile: "_run-detail-contract.json",
+    topRecommendationsFile: "_top-5-recommendations.json",
     screenshotDir: "visual-review-screenshots",
   },
   {
@@ -51,30 +57,35 @@ export const SKILL_CATALOG: SkillCatalogEntry[] = [
     kind: "report",
     reportFile: "code-quality-audit.md",
     runDetailContractFile: "_run-detail-contract.json",
+    topRecommendationsFile: "_top-5-recommendations.json",
   },
   {
     skill: "web-security-audit",
     kind: "report",
     reportFile: "web-security-audit.md",
     runDetailContractFile: "_run-detail-contract.json",
+    topRecommendationsFile: "_top-5-recommendations.json",
   },
   {
     skill: "web-performance-audit",
     kind: "report",
     reportFile: "web-performance-audit.md",
     runDetailContractFile: "_run-detail-contract.json",
+    topRecommendationsFile: "_top-5-recommendations.json",
   },
   {
     skill: "product-marketer",
     kind: "content-bundle",
     contentDir: "product-marketing",
     runDetailContractFile: "product-marketing/_run-detail-contract.json",
+    topRecommendationsFile: "product-marketing/_top-5-recommendations.json",
   },
   {
     skill: "product-docs-author",
     kind: "content-bundle",
     contentDir: "docs",
     runDetailContractFile: "docs/_run-detail-contract.json",
+    topRecommendationsFile: "docs/_top-5-recommendations.json",
   },
 ];
 
