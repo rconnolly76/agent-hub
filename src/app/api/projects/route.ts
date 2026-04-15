@@ -8,7 +8,13 @@ export async function GET() {
   const allProjects = await db.query.projects.findMany({
     orderBy: (p, { desc }) => [desc(p.createdAt)],
   });
-  const safe = allProjects.map(({ apiKey: _key, ...rest }) => rest);
+  const safe = allProjects.map((project) => {
+    const sanitized: Omit<typeof project, "apiKey"> & { apiKey?: string } = {
+      ...project,
+    };
+    delete sanitized.apiKey;
+    return sanitized;
+  });
   return NextResponse.json(safe);
 }
 

@@ -131,7 +131,6 @@ function extractFindings(md: string): ParsedFinding[] {
 
     const title = titleMatch[1].trim();
 
-    const severityMatch = block.match(/### (🔴[^\n]*|🟡[^\n]*|🔵[^\n]*|⚪[^\n]*|🔍[^\n]*)/);
     let severity = "info";
     const fullSeverity = findPrecedingSeverityHeader(text, block);
     if (fullSeverity.includes("🔴") || fullSeverity.includes("Fix immediately"))

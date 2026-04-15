@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { runs, metrics, findings } from "@/lib/db/schema";
-import { eq, sql, inArray } from "drizzle-orm";
+import { sql, inArray } from "drizzle-orm";
 import Link from "next/link";
 import {
   Card,
