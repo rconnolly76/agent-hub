@@ -177,11 +177,30 @@
 }
 
 .report-prose code {
-  font-size: 0.875rem;
-  background: var(--muted);
+  font-size: 0.8125rem;
+  background: color-mix(in oklab, var(--muted) 78%, transparent);
+  border: 1px solid color-mix(in oklab, var(--border) 75%, transparent);
   padding: 0.125rem 0.375rem;
-  border-radius: 0.25rem;
+  border-radius: 0.375rem;
   font-family: var(--font-mono);
+  color: var(--foreground);
+}
+
+.report-prose pre {
+  margin: 1rem 0 1.5rem;
+  border-radius: 0.625rem;
+  border: 1px solid var(--border);
+  background: color-mix(in oklab, var(--muted) 80%, transparent);
+  padding: 0.875rem 1rem;
+  overflow-x: auto;
+}
+
+.report-prose pre code {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  border-radius: 0;
+  color: inherit;
 }
 
 .report-prose a {
@@ -203,7 +222,7 @@
 }
 
 .report-table-th {
-  padding: 0.625rem 0.75rem !important;
+  padding: 0.625rem 0.875rem !important;
   text-align: left !important;
   font-size: 0.75rem !important;
   font-weight: 600 !important;
@@ -215,7 +234,7 @@
 }
 
 .report-table-td {
-  padding: 0.5rem 0.75rem !important;
+  padding: 0.625rem 0.875rem !important;
   font-size: 0.875rem !important;
   color: var(--muted-foreground) !important;
   vertical-align: top !important;
@@ -237,10 +256,27 @@
 
 .report-table code {
   font-size: 0.75rem !important;
-  background: var(--muted) !important;
+  background: color-mix(in oklab, var(--muted) 78%, transparent) !important;
+  border: 1px solid color-mix(in oklab, var(--border) 75%, transparent) !important;
   padding: 0.125rem 0.25rem !important;
-  border-radius: 0.25rem !important;
+  border-radius: 0.375rem !important;
   font-family: var(--font-mono) !important;
+}
+
+.report-recommendations > ol,
+.report-recommendations > ul {
+  list-style: none;
+  padding-left: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.report-recommendations > ol > li,
+.report-recommendations > ul > li {
+  border: 1px solid var(--border);
+  border-radius: 0.625rem;
+  background: color-mix(in oklab, var(--card) 85%, transparent);
+  padding: 0.75rem 0.875rem;
 }
 
 @keyframes fade-in-up {

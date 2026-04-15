@@ -124,6 +124,11 @@ export function MetricsSidebar({
           <CardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Health</CardTitle>
         </CardHeader>
         <CardContent>
+          <div className="mb-2">
+            <span className="inline-flex items-center rounded-full border border-border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              {skillType}
+            </span>
+          </div>
           <div className="divide-y divide-border">
             {healthMetrics.map((m) => (
               <MetricRow key={m.key} metric={m} />

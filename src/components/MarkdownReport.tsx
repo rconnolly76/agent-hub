@@ -10,6 +10,7 @@ interface MarkdownReportProps {
   content: string;
   screenshotUrls: Record<string, string>;
   excludeSections?: string[];
+  showTableOfContents?: boolean;
 }
 
 interface Section {
@@ -108,6 +109,7 @@ function CollapsibleSection({
   isActive: boolean;
 }) {
   const [open, setOpen] = useState(defaultOpen);
+  const isRecommendationSection = /recommend/i.test(section.title);
 
   return (
     <div
@@ -145,7 +147,9 @@ function CollapsibleSection({
       </button>
       {open && (
         <div className="px-6 pb-6 animate-fade-in">
-          <article className={proseClasses}>
+          <article
+            className={`${proseClasses}${isRecommendationSection ? " report-recommendations" : ""}`}
+          >
             <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={rehypePlugins} components={markdownComponents}>
               {section.body}
             </ReactMarkdown>
@@ -247,6 +251,7 @@ export function MarkdownReport({
   content,
   screenshotUrls,
   excludeSections = [],
+  showTableOfContents = true,
 }: MarkdownReportProps) {
   const [activeSlug, setActiveSlug] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -307,7 +312,9 @@ export function MarkdownReport({
       <BackToTop />
 
       <div className="flex gap-6">
-        <TableOfContents sections={sections} activeSlug={activeSlug} onJump={handleJump} />
+        {showTableOfContents && (
+          <TableOfContents sections={sections} activeSlug={activeSlug} onJump={handleJump} />
+        )}
 
         <div className="min-w-0 flex-1">
           {preamble && (

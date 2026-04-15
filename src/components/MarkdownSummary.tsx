@@ -9,7 +9,7 @@ interface MarkdownSummaryProps {
 
 export function MarkdownSummary({ content }: MarkdownSummaryProps) {
   return (
-    <article className="report-prose max-w-none">
+    <article className="report-prose max-w-[75ch]">
       <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
     </article>
   );
