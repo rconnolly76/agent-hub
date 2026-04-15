@@ -27,6 +27,13 @@ interface ProjectWithStats {
     findingsCount: number;
   } | null;
   runCount: number;
+  skillHealth: {
+    skillType: string;
+    runId: string;
+    level: "healthy" | "warning" | "critical" | "unknown";
+    score: number;
+  }[];
+  healthScore: number | null;
 }
 
 async function getProjectsWithStats(): Promise<ProjectWithStats[]> {
@@ -53,20 +60,33 @@ async function getProjectsWithStats(): Promise<ProjectWithStats[]> {
   const latestRunIds = allProjects
     .map((p) => runsByProject.get(p.id)?.[0]?.id)
     .filter((id): id is string => !!id);
+  const latestRunIdSet = new Set(latestRunIds);
+
+  for (const project of allProjects) {
+    const projectRuns = runsByProject.get(project.id) ?? [];
+    const seenSkillTypes = new Set<string>();
+    for (const run of projectRuns) {
+      if (seenSkillTypes.has(run.skillType)) continue;
+      seenSkillTypes.add(run.skillType);
+      latestRunIdSet.add(run.id);
+    }
+  }
+
+  const metricRunIds = Array.from(latestRunIdSet);
 
   let allMetrics: { runId: string; key: string; value: number; unit: string | null }[] = [];
   let allFindings: { runId: string; count: number }[] = [];
 
-  if (latestRunIds.length > 0) {
+  if (metricRunIds.length > 0) {
     const [metricsResult, findingsResult] = await Promise.all([
-      db.select().from(metrics).where(inArray(metrics.runId, latestRunIds)),
+      db.select().from(metrics).where(inArray(metrics.runId, metricRunIds)),
       db
         .select({
           runId: findings.runId,
           count: sql<number>`count(*)`.as("count"),
         })
         .from(findings)
-        .where(inArray(findings.runId, latestRunIds))
+        .where(inArray(findings.runId, metricRunIds))
         .groupBy(findings.runId),
     ]);
     allMetrics = metricsResult;
@@ -103,6 +123,47 @@ async function getProjectsWithStats(): Promise<ProjectWithStats[]> {
       };
     }
 
+    const latestBySkill = new Map<string, (typeof projectRuns)[number]>();
+    for (const run of projectRuns) {
+      if (!latestBySkill.has(run.skillType)) {
+        latestBySkill.set(run.skillType, run);
+      }
+    }
+
+    const skillHealth = Array.from(latestBySkill.values()).map((run) => {
+      const runMetrics = metricsByRun.get(run.id) ?? [];
+      const critical = runMetrics.find((m) => m.key === "severity_critical")?.value ?? 0;
+      const warning = runMetrics.find((m) => m.key === "severity_warning")?.value ?? 0;
+
+      let level: ProjectWithStats["skillHealth"][number]["level"] = "unknown";
+      let score = 50;
+      if (critical > 0) {
+        level = "critical";
+        score = 20;
+      } else if (warning > 0) {
+        level = "warning";
+        score = 60;
+      } else if (runMetrics.length > 0) {
+        level = "healthy";
+        score = 100;
+      }
+
+      return {
+        skillType: run.skillType,
+        runId: run.id,
+        level,
+        score,
+      };
+    });
+
+    const healthScore =
+      skillHealth.length > 0
+        ? Math.round(
+            skillHealth.reduce((sum, entry) => sum + entry.score, 0) /
+              skillHealth.length
+          )
+        : null;
+
     return {
       id: project.id,
       name: project.name,
@@ -110,6 +171,8 @@ async function getProjectsWithStats(): Promise<ProjectWithStats[]> {
       createdAt: project.createdAt,
       latestRun,
       runCount: projectRuns.length,
+      skillHealth,
+      healthScore,
     };
   });
 }
@@ -157,6 +220,19 @@ function timeAgo(date: Date): string {
   const diffDays = Math.floor(diffHours / 24);
   if (diffDays < 30) return `${diffDays}d ago`;
   return date.toLocaleDateString();
+}
+
+function skillHealthTone(level: "healthy" | "warning" | "critical" | "unknown"): string {
+  switch (level) {
+    case "healthy":
+      return "border-emerald-500/25 bg-emerald-500/10 text-emerald-500";
+    case "warning":
+      return "border-amber-500/25 bg-amber-500/10 text-amber-500";
+    case "critical":
+      return "border-red-500/25 bg-red-500/10 text-red-500";
+    default:
+      return "border-border bg-muted/50 text-muted-foreground";
+  }
 }
 
 export default async function HomePage() {
@@ -214,6 +290,39 @@ export default async function HomePage() {
                       </span>
                     )}
                   </div>
+
+                  {project.skillHealth.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-border/80">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                          Skill Health
+                        </span>
+                        {project.healthScore !== null && (
+                          <span className="text-[11px] font-medium text-foreground">
+                            Score {project.healthScore}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-1.5">
+                        {project.skillHealth.slice(0, 6).map((entry) => (
+                          <div
+                            key={entry.runId}
+                            className={`flex items-center gap-1.5 rounded-md border px-2 py-1 text-[11px] ${skillHealthTone(entry.level)}`}
+                          >
+                            <span className="h-1.5 w-1.5 rounded-full bg-current shrink-0" />
+                            <span className="truncate">{formatSkillType(entry.skillType)}</span>
+                          </div>
+                        ))}
+                      </div>
+
+                      {project.skillHealth.length > 6 && (
+                        <p className="mt-1.5 text-[10px] text-muted-foreground">
+                          +{project.skillHealth.length - 6} more skills
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </Link>
