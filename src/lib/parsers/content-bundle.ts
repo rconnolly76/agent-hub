@@ -16,6 +16,19 @@ export interface ContentBundleManifest {
   auditReport?: string;
 }
 
+/** Match a `content:…` path to manifest.files[].path (handles prefix mismatches). */
+export function manifestFileForPath(
+  manifest: ContentBundleManifest,
+  relPath: string
+): ContentBundleManifest["files"][number] | undefined {
+  const norm = relPath.replace(/^\//, "").replace(/\\/g, "/");
+  for (const f of manifest.files) {
+    const p = f.path.replace(/^\//, "").replace(/\\/g, "/");
+    if (p === norm || p.endsWith(norm) || norm.endsWith(p)) return f;
+  }
+  return undefined;
+}
+
 export function parseContentBundleManifestJson(text: string): ContentBundleManifest {
   const data = JSON.parse(text) as unknown;
   if (typeof data !== "object" || data === null || !("summary" in data)) {

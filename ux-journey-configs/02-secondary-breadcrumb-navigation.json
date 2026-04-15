@@ -1,0 +1,59 @@
+{
+  "name": "Breadcrumb and back navigation between pages",
+  "classification": "secondary",
+  "id": "S1",
+  "startUrl": "http://localhost:3000/",
+  "viewport": { "width": 1440, "height": 900 },
+  "abortOnFailure": false,
+  "successCriteria": "User can navigate forward through all three pages and back using breadcrumbs without losing orientation",
+  "steps": [
+    {
+      "id": 1,
+      "action": "navigate",
+      "target": "http://localhost:3000/",
+      "description": "Start at projects dashboard",
+      "expect": {
+        "title_contains": "Agent Hub",
+        "elements": ["header", "h1"]
+      }
+    },
+    {
+      "id": 2,
+      "action": "click",
+      "target": "a[href^='/projects/']",
+      "description": "Navigate to first project",
+      "expect": {
+        "url_contains": "/projects/"
+      }
+    },
+    {
+      "id": 3,
+      "action": "click",
+      "target": "a[href^='/runs/']",
+      "description": "Navigate to first run",
+      "expect": {
+        "url_contains": "/runs/"
+      }
+    },
+    {
+      "id": 4,
+      "action": "click",
+      "target": "a[href^='/projects/']",
+      "description": "Click back breadcrumb to project detail",
+      "expect": {
+        "url_contains": "/projects/"
+      }
+    },
+    {
+      "id": 5,
+      "action": "click",
+      "target": "a[href='/']",
+      "description": "Click 'All projects' breadcrumb back to dashboard",
+      "expect": {
+        "url_contains": "localhost:3000"
+      }
+    }
+  ],
+  "reviewerNotes": "Layer B: H3 (user control and freedom) is the key heuristic — can users navigate freely? Check breadcrumb visibility, link discoverability, and whether the user always knows where they are. Emotional arc should feel 'in control' throughout. Check if header nav is consistent across all pages.",
+  "failureModes": []
+}

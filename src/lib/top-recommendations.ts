@@ -17,6 +17,121 @@ export interface TopRecommendationsPayloadV1 {
 
 const PRIORITIES: RecommendationPriority[] = ["P1", "P2", "P3", "P4", "P5"];
 
+function inferSeverity(text: string): TopRecommendation["severity"] | undefined {
+  const normalized = text.toLowerCase();
+  if (normalized.includes("critical") || normalized.includes("🔴")) return "critical";
+  if (normalized.includes("warning") || normalized.includes("🟡")) return "warning";
+  if (normalized.includes("investigate") || normalized.includes("🔍")) return "investigate";
+  if (normalized.includes("low") || normalized.includes("⚪")) return "low";
+  if (normalized.includes("info") || normalized.includes("🔵")) return "info";
+  return undefined;
+}
+
+function cleanMarkdownText(input: string): string {
+  return input
+    .replace(/\*\*/g, "")
+    .replace(/`/g, "")
+    .replace(/\[(.*?)\]\(.*?\)/g, "$1")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function extractRecommendationsSection(markdown: string): string {
+  const sectionMatch = markdown.match(
+    /##\s+(?:Top\s*5\s+)?Recommendations[^\n]*\n([\s\S]*?)(?=\n##\s+|$)/
+  );
+  return sectionMatch?.[1]?.trim() ?? "";
+}
+
+export function buildTopRecommendationsFromMarkdown(params: {
+  skillType: string;
+  markdown: string;
+}): TopRecommendationsPayloadV1 | null {
+  const source = extractRecommendationsSection(params.markdown) || params.markdown;
+  const lines = source.split("\n");
+  const candidates: Array<{
+    title: string;
+    action: string;
+    rationale?: string;
+    severity?: TopRecommendation["severity"];
+  }> = [];
+  const seen = new Set<string>();
+
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i].trim();
+    if (!line) continue;
+
+    let title = "";
+    let action = "";
+
+    const rMatch = line.match(/^\*\*R\d+\.\s*(.+?)\*\*(?:\s*[—:-]\s*(.*))?$/);
+    if (rMatch) {
+      title = cleanMarkdownText(rMatch[1]);
+      action = cleanMarkdownText(rMatch[2] ?? title);
+    }
+
+    const numberedMatch = !title
+      ? line.match(/^\d+\.\s+\*\*(.+?)\*\*(?:\s*[—:-]\s*(.*))?$/)
+      : null;
+    if (numberedMatch) {
+      title = cleanMarkdownText(numberedMatch[1]);
+      action = cleanMarkdownText(numberedMatch[2] ?? title);
+    }
+
+    const bulletBoldMatch = !title
+      ? line.match(/^[-*]\s+\*\*(.+?)\*\*(?:\s*[—:-]\s*(.*))?$/)
+      : null;
+    if (bulletBoldMatch) {
+      title = cleanMarkdownText(bulletBoldMatch[1]);
+      action = cleanMarkdownText(bulletBoldMatch[2] ?? title);
+    }
+
+    const numberedPlainMatch = !title ? line.match(/^\d+\.\s+(.+)$/) : null;
+    if (numberedPlainMatch) {
+      const plain = cleanMarkdownText(numberedPlainMatch[1]);
+      title = plain.slice(0, 120);
+      action = plain;
+    }
+
+    if (!title) continue;
+    const key = title.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    let rationale: string | undefined;
+    for (let j = i + 1; j < Math.min(i + 4, lines.length); j += 1) {
+      const next = lines[j].trim();
+      if (!next) continue;
+      if (/^[-*]\s+|^\d+\.\s+|^###\s+|^\*\*R\d+\./.test(next)) break;
+      rationale = cleanMarkdownText(next);
+      break;
+    }
+
+    candidates.push({
+      title,
+      action: action || title,
+      rationale,
+      severity: inferSeverity(`${line} ${rationale ?? ""}`),
+    });
+    if (candidates.length === 5) break;
+  }
+
+  if (candidates.length === 0) return null;
+
+  return {
+    version: "1.0",
+    skillType: params.skillType,
+    generatedAt: new Date().toISOString(),
+    recommendations: candidates.slice(0, 5).map((candidate, index) => ({
+      priority: PRIORITIES[index],
+      title: candidate.title,
+      action: candidate.action,
+      rationale: candidate.rationale,
+      severity: candidate.severity,
+    })),
+  };
+}
+
 function parsePriority(input: unknown): RecommendationPriority | null {
   if (typeof input !== "string") return null;
   const normalized = input.trim().toUpperCase();

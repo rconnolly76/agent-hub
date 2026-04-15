@@ -146,6 +146,10 @@ export function ensureExecutiveSummaryWithNextSteps(
   executiveSummary: string,
   options: EnsureSummaryOptions
 ): string {
+  if (!options.topRecommendations || options.topRecommendations.length === 0) {
+    return executiveSummary.trim();
+  }
+
   const summary = executiveSummary.trim();
   const existingIndex = summary.indexOf(NEXT_STEPS_HEADER);
   const baseSummary =

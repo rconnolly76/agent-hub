@@ -1,0 +1,67 @@
+{
+  "name": "Screenshot gallery and lightbox interaction",
+  "classification": "secondary",
+  "id": "S2",
+  "startUrl": "http://localhost:3000/",
+  "viewport": { "width": 1440, "height": 900 },
+  "abortOnFailure": false,
+  "successCriteria": "User can view screenshots in the gallery and open/close the lightbox overlay",
+  "steps": [
+    {
+      "id": 1,
+      "action": "navigate",
+      "target": "http://localhost:3000/",
+      "description": "Start at projects dashboard",
+      "expect": {
+        "title_contains": "Agent Hub"
+      }
+    },
+    {
+      "id": 2,
+      "action": "click",
+      "target": "a[href^='/projects/']",
+      "description": "Navigate to first project",
+      "expect": {
+        "url_contains": "/projects/"
+      }
+    },
+    {
+      "id": 3,
+      "action": "click",
+      "target": "a[href^='/runs/']",
+      "description": "Navigate to a run with screenshots",
+      "expect": {
+        "url_contains": "/runs/"
+      }
+    },
+    {
+      "id": 4,
+      "action": "scroll",
+      "target": "body",
+      "description": "Scroll down to screenshot gallery section",
+      "expect": {
+        "elements": ["h2"]
+      }
+    },
+    {
+      "id": 5,
+      "action": "click",
+      "target": "button.group",
+      "description": "Click first screenshot thumbnail to open lightbox",
+      "expect": {
+        "elements": [".fixed"]
+      }
+    },
+    {
+      "id": 6,
+      "action": "click",
+      "target": ".fixed",
+      "description": "Click backdrop to close lightbox",
+      "expect": {}
+    }
+  ],
+  "reviewerNotes": "Layer B: This journey exercises the only interactive client-side component. Microinteraction protocol is key — check hover states on thumbnails, transition quality when lightbox opens/closes, and whether the close affordance (X button) is discoverable. H3 (user control) — can the user easily dismiss the lightbox? Check ESC key support.",
+  "failureModes": [
+    { "step": 5, "trigger": "no screenshots on this run", "expected": "gallery section not rendered" }
+  ]
+}

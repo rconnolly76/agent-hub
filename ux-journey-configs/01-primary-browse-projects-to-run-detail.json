@@ -1,0 +1,65 @@
+{
+  "name": "Browse projects dashboard to run detail",
+  "classification": "primary",
+  "id": "P1",
+  "startUrl": "http://localhost:3000/",
+  "viewport": { "width": 1440, "height": 900 },
+  "abortOnFailure": false,
+  "successCriteria": "User can navigate from projects dashboard → project detail → run detail with report and metrics visible",
+  "steps": [
+    {
+      "id": 1,
+      "action": "navigate",
+      "target": "http://localhost:3000/",
+      "description": "Land on projects dashboard",
+      "expect": {
+        "title_contains": "Agent Hub",
+        "elements": ["header", "h1"]
+      }
+    },
+    {
+      "id": 2,
+      "action": "click",
+      "target": "a[href^='/projects/']:nth-of-type(2)",
+      "description": "Click agent-hub project card to drill into project detail",
+      "expect": {
+        "url_contains": "/projects/",
+        "elements": ["h1", "h2"]
+      }
+    },
+    {
+      "id": 3,
+      "action": "scroll",
+      "target": "body",
+      "description": "Scroll to see run history list",
+      "expect": {
+        "elements": ["a[href^='/runs/']"]
+      }
+    },
+    {
+      "id": 4,
+      "action": "click",
+      "target": "a[href^='/runs/']",
+      "description": "Click first run card to view run detail",
+      "expect": {
+        "url_contains": "/runs/",
+        "elements": ["h1", "article"]
+      }
+    },
+    {
+      "id": 5,
+      "action": "scroll",
+      "target": "body",
+      "description": "Scroll through run report content",
+      "expect": {
+        "elements": ["article"]
+      }
+    }
+  ],
+  "reviewerNotes": "This is the core read-only drill-down flow. Layer B: pay attention to information hierarchy on each page — is the most important content visible without scrolling? Check card hover states and visual affordances. The transition between pages should feel like progressive disclosure (overview → detail → deep detail). H1 (visibility) should show clear page identity at each level. H6 (recognition over recall) — can the user orient themselves at each level without breadcrumbs?",
+  "failureModes": [
+    { "step": 1, "trigger": "database error", "expected": "error page or empty state" },
+    { "step": 2, "trigger": "no projects in database", "expected": "empty state card with CLI instructions" },
+    { "step": 4, "trigger": "report blob URL unreachable", "expected": "fallback 'No report content available' text" }
+  ]
+}

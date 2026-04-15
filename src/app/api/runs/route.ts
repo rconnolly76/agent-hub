@@ -4,6 +4,7 @@ import {
   projects,
   runs,
   artifacts as artifactsTable,
+  contentDocuments as contentDocumentsTable,
   metrics as metricsTable,
   findings as findingsTable,
 } from "@/lib/db/schema";
@@ -16,11 +17,11 @@ import {
 } from "@/lib/parsers";
 import { ensureExecutiveSummaryWithNextSteps } from "@/lib/parsers/executive-summary";
 import {
-  buildTopRecommendationsFromFindings,
   parseTopRecommendationsPayload,
 } from "@/lib/top-recommendations";
 import {
   buildSyntheticBundleReport,
+  manifestFileForPath,
   parseContentBundleForIngest,
   parseContentBundleManifestJson,
   type ContentBundleManifest,
@@ -224,23 +225,15 @@ async function ingestReportArtifact(opts: {
     skillParserConfig,
     override,
   });
-  const topRecommendations =
-    providedTopRecommendations ??
-    buildTopRecommendationsFromFindings({
-      skillType,
-      findings: parsed.findings,
-      metrics: parsed.metrics,
-    });
-
-  const executiveSummary = ensureExecutiveSummaryWithNextSteps(
-    parsed.executiveSummary,
-    {
-      skillType,
-      findings: parsed.findings,
-      metrics: parsed.metrics,
-      topRecommendations: topRecommendations.recommendations,
-    }
-  );
+  const topRecommendations = providedTopRecommendations;
+  const executiveSummary = topRecommendations
+    ? ensureExecutiveSummaryWithNextSteps(parsed.executiveSummary, {
+        skillType,
+        findings: parsed.findings,
+        metrics: parsed.metrics,
+        topRecommendations: topRecommendations.recommendations,
+      })
+    : parsed.executiveSummary;
 
   const reportBlob = await put(
     `${project.name}/${skillType}/report-${Date.now()}.md`,
@@ -258,7 +251,7 @@ async function ingestReportArtifact(opts: {
       rawMetadata: {
         artifactType: "report" as const,
         runDetailContract: providedRunDetailContract ?? parsed.runDetail ?? null,
-        topRecommendations,
+        topRecommendations: topRecommendations ?? null,
       },
     })
     .returning();
@@ -433,22 +426,18 @@ async function ingestContentBundle(opts: {
     override,
   });
   const effectiveSkillType = manifest.skillType?.trim() || skillType;
-  const topRecommendations =
-    providedTopRecommendations ??
-    buildTopRecommendationsFromFindings({
-      skillType: effectiveSkillType,
-      findings: parsed.findings,
-      metrics: parsed.metrics,
-    });
-  const executiveSummary = ensureExecutiveSummaryWithNextSteps(
-    parsed.executiveSummary,
-    {
-      skillType: effectiveSkillType,
-      findings: parsed.findings,
-      metrics: parsed.metrics,
-      topRecommendations: topRecommendations.recommendations,
-    }
-  );
+  const reportBody =
+    auditMarkdown?.trim() ? auditMarkdown : buildSyntheticBundleReport(manifest);
+  const reportName = auditMarkdown?.trim() ? auditFilename : "bundle-overview.md";
+  const topRecommendations = providedTopRecommendations;
+  const executiveSummary = topRecommendations
+    ? ensureExecutiveSummaryWithNextSteps(parsed.executiveSummary, {
+        skillType: effectiveSkillType,
+        findings: parsed.findings,
+        metrics: parsed.metrics,
+        topRecommendations: topRecommendations.recommendations,
+      })
+    : parsed.executiveSummary;
 
   const manifestBlob = await put(
     `${project.name}/${skillType}/bundle/manifest-${Date.now()}.json`,
@@ -468,7 +457,7 @@ async function ingestContentBundle(opts: {
         manifest,
         mode: manifest.mode ?? null,
         runDetailContract: providedRunDetailContract ?? parsed.runDetail ?? null,
-        topRecommendations,
+        topRecommendations: topRecommendations ?? null,
       },
     })
     .returning();
@@ -480,16 +469,6 @@ async function ingestContentBundle(opts: {
     blobUrl: manifestBlob.url,
     role: "manifest",
   });
-
-  let reportBody: string;
-  let reportName: string;
-  if (auditMarkdown?.trim()) {
-    reportBody = auditMarkdown;
-    reportName = auditFilename;
-  } else {
-    reportBody = buildSyntheticBundleReport(manifest);
-    reportName = "bundle-overview.md";
-  }
 
   const reportBlob = await put(
     `${project.name}/${skillType}/report-${Date.now()}.md`,
@@ -512,21 +491,56 @@ async function ingestContentBundle(opts: {
     const relPath = key.slice("content:".length);
     if (!relPath) continue;
 
-    const buf = await value.arrayBuffer();
     const mime = value.type || "text/markdown";
+    const isMarkdown =
+      relPath.toLowerCase().endsWith(".md") ||
+      mime.includes("markdown") ||
+      mime.startsWith("text/");
+
+    let uploadBody: Buffer | string;
+    let bodyMarkdown: string | null = null;
+    if (isMarkdown) {
+      bodyMarkdown = await value.text();
+      uploadBody = bodyMarkdown;
+    } else {
+      uploadBody = Buffer.from(await value.arrayBuffer());
+    }
+
     const blob = await put(
       `${project.name}/${skillType}/bundle/${relPath.replace(/^\//, "")}`,
-      buf,
+      uploadBody,
       { access: "public", contentType: mime, addRandomSuffix: true }
     );
 
-    await db.insert(artifactsTable).values({
-      runId: run.id,
-      filename: relPath,
-      mimeType: mime,
-      blobUrl: blob.url,
-      role: "content",
-    });
+    const [artifactRow] = await db
+      .insert(artifactsTable)
+      .values({
+        runId: run.id,
+        filename: relPath,
+        mimeType: mime,
+        blobUrl: blob.url,
+        role: "content",
+      })
+      .returning({ id: artifactsTable.id });
+
+    if (bodyMarkdown !== null) {
+      const meta = manifestFileForPath(manifest, relPath);
+      await db.insert(contentDocumentsTable).values({
+        projectId: project.id,
+        runId: run.id,
+        artifactId: artifactRow.id,
+        ingestSkillType: skillType,
+        manifestSkillType: effectiveSkillType,
+        relativePath: relPath,
+        title: meta?.title ?? relPath,
+        category: meta?.category ?? null,
+        description: meta?.description ?? null,
+        bodyMarkdown,
+        blobUrl: blob.url,
+        mimeType: mime,
+      });
+    }
+
     contentFiles.push(relPath);
   }
 

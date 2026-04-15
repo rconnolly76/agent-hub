@@ -1,0 +1,594 @@
+{
+  "journey": {
+    "name": "Browse projects dashboard to run detail",
+    "classification": "primary",
+    "id": "P1",
+    "startUrl": "http://localhost:3000/",
+    "viewport": {
+      "width": 1440,
+      "height": 900
+    },
+    "abortOnFailure": false,
+    "successCriteria": "User can navigate from projects dashboard → project detail → run detail with report and metrics visible",
+    "steps": [
+      {
+        "id": 1,
+        "action": "navigate",
+        "target": "http://localhost:3000/",
+        "description": "Land on projects dashboard",
+        "expect": {
+          "title_contains": "Agent Hub",
+          "elements": [
+            "header",
+            "h1"
+          ]
+        }
+      },
+      {
+        "id": 2,
+        "action": "click",
+        "target": "a[href^='/projects/']:nth-of-type(2)",
+        "description": "Click agent-hub project card to drill into project detail",
+        "expect": {
+          "url_contains": "/projects/",
+          "elements": [
+            "h1",
+            "h2"
+          ]
+        }
+      },
+      {
+        "id": 3,
+        "action": "scroll",
+        "target": "body",
+        "description": "Scroll to see run history list",
+        "expect": {
+          "elements": [
+            "a[href^='/runs/']"
+          ]
+        }
+      },
+      {
+        "id": 4,
+        "action": "click",
+        "target": "a[href^='/runs/']",
+        "description": "Click first run card to view run detail",
+        "expect": {
+          "url_contains": "/runs/",
+          "elements": [
+            "h1",
+            "article"
+          ]
+        }
+      },
+      {
+        "id": 5,
+        "action": "scroll",
+        "target": "body",
+        "description": "Scroll through run report content",
+        "expect": {
+          "elements": [
+            "article"
+          ]
+        }
+      }
+    ],
+    "reviewerNotes": "This is the core read-only drill-down flow. Layer B: pay attention to information hierarchy on each page — is the most important content visible without scrolling? Check card hover states and visual affordances. The transition between pages should feel like progressive disclosure (overview → detail → deep detail). H1 (visibility) should show clear page identity at each level. H6 (recognition over recall) — can the user orient themselves at each level without breadcrumbs?",
+    "failureModes": [
+      {
+        "step": 1,
+        "trigger": "database error",
+        "expected": "error page or empty state"
+      },
+      {
+        "step": 2,
+        "trigger": "no projects in database",
+        "expected": "empty state card with CLI instructions"
+      },
+      {
+        "step": 4,
+        "trigger": "report blob URL unreachable",
+        "expected": "fallback 'No report content available' text"
+      }
+    ]
+  },
+  "startedAt": "2026-04-15T13:02:44.197Z",
+  "steps": [
+    {
+      "id": 1,
+      "description": "Land on projects dashboard",
+      "action": "navigate",
+      "status": "pass",
+      "errors": [],
+      "consoleLogs": [
+        {
+          "type": "log",
+          "text": "[HMR] connected",
+          "location": {
+            "url": "http://localhost:3000/_next/static/chunks/0yek_next_dist_0z5b.ge._.js",
+            "lineNumber": 2431,
+            "columnNumber": 27
+          },
+          "timestamp": 1776258164427
+        }
+      ],
+      "networkRequests": [
+        {
+          "url": "http://localhost:3000/_next/static/chunks/%5Broot-of-the-server%5D__0i-ey~l._.css",
+          "method": "GET",
+          "status": 200,
+          "duration": 3.557,
+          "resourceType": "stylesheet",
+          "timestamp": 1776258164273,
+          "flagged": false
+        },
+        {
+          "url": "http://localhost:3000/_next/static/media/797e433ab948586e-s.p.0.q-h669a_dqa.woff2",
+          "method": "GET",
+          "status": 200,
+          "duration": 3.096,
+          "resourceType": "font",
+          "timestamp": 1776258164286,
+          "flagged": false
+        },
+        {
+          "url": "http://localhost:3000/_next/static/media/caa3a2e1cccd8315-s.p.16t1db8_9y2o~.woff2",
+          "method": "GET",
+          "status": 200,
+          "duration": 2.8680000000000003,
+          "resourceType": "font",
+          "timestamp": 1776258164286,
+          "flagged": false
+        },
+        {
+          "url": "http://localhost:3000/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_123o9se._.js",
+          "method": "GET",
+          "status": 200,
+          "duration": 13.167,
+          "resourceType": "script",
+          "timestamp": 1776258164288,
+          "flagged": false
+        },
+        {
+          "url": "http://localhost:3000/_next/static/chunks/0yek_next_dist_compiled_0v55g_a._.js",
+          "method": "GET",
+          "status": 200,
+          "duration": 19.017999999999997,
+          "resourceType": "script",
+          "timestamp": 1776258164330,
+          "flagged": false
+        },
+        {
+          "url": "http://localhost:3000/_next/static/chunks/0yek_next_dist_compiled_react-server-dom-turbopack_0frvxtm._.js",
+          "method": "GET",
+          "status": 200,
+          "duration": 19.144000000000002,
+          "resourceType": "script",
+          "timestamp": 1776258164330,
+          "flagged": false
+        },
+        {
+          "url": "http://localhost:3000/_next/static/chunks/0yek_%40swc_helpers_cjs_0eqxquu._.js",
+          "method": "GET",
+          "status": 200,
+          "duration": 25.316,
+          "resourceType": "script",
+          "timestamp": 1776258164330,
+          "flagged": false
+        },
+        {
+          "url": "http://localhost:3000/_next/static/chunks/agent-hub_0rqeker._.js",
+          "method": "GET",
+          "status": 200,
+          "duration": 22.317999999999998,
+          "resourceType": "script",
+          "timestamp": 1776258164330,
+          "flagged": false
+        },
+        {
+          "url": "http://localhost:3000/_next/static/chunks/0yek_next_dist_0z5b.ge._.js",
+          "method": "GET",
+          "status": 200,
+          "duration": 27.242000000000004,
+          "resourceType": "script",
+          "timestamp": 1776258164330,
+          "flagged": false
+        },
+        {
+          "url": "http://localhost:3000/_next/static/chunks/turbopack-agent-hub_0o1u-k6._.js",
+          "method": "GET",
+          "status": 200,
+          "duration": 34.346,
+          "resourceType": "script",
+          "timestamp": 1776258164331,
+          "flagged": false
+        },
+        {
+          "url": "http://localhost:3000/_next/static/chunks/agent-hub_src_app_layout_tsx_0y5vayo._.js",
+          "method": "GET",
+          "status": 200,
+          "duration": 41.493,
+          "resourceType": "script",
+          "timestamp": 1776258164331,
+          "flagged": false
+        },
+        {
+          "url": "http://localhost:3000/_next/static/chunks/agent-hub_0l1c1fj._.js",
+          "method": "GET",
+          "status": 200,
+          "duration": 43.75,
+          "resourceType": "script",
+          "timestamp": 1776258164331,
+          "flagged": false
+        },
+        {
+          "url": "http://localhost:3000/_next/static/chunks/0yek_next_dist_0vo.uzy._.js",
+          "method": "GET",
+          "status": 200,
+          "duration": 45.631,
+          "resourceType": "script",
+          "timestamp": 1776258164331,
+          "flagged": false
+        },
+        {
+          "url": "http://localhost:3000/_next/static/chunks/0yek_next_dist_client_0ps~~7b._.js",
+          "method": "GET",
+          "status": 200,
+          "duration": 52.46,
+          "resourceType": "script",
+          "timestamp": 1776258164334,
+          "flagged": false
+        },
+        {
+          "url": "http://localhost:3000/_next/static/chunks/0yek_next_dist_client_components_builtin_global-error_0pwb2kt.js",
+          "method": "GET",
+          "status": 200,
+          "duration": 57.891,
+          "resourceType": "script",
+          "timestamp": 1776258164334,
+          "flagged": false
+        },
+        {
+          "url": "http://localhost:3000/_next/static/chunks/agent-hub_src_app_error_tsx_0pwb2kt._.js",
+          "method": "GET",
+          "status": 200,
+          "duration": 52.257,
+          "resourceType": "script",
+          "timestamp": 1776258164334,
+          "flagged": false
+        },
+        {
+          "url": "http://localhost:3000/_next/static/chunks/0yek_next_dist_compiled_next-devtools_index_0ceq81p.js",
+          "method": "GET",
+          "status": 200,
+          "duration": 59.711,
+          "resourceType": "script",
+          "timestamp": 1776258164334,
+          "flagged": false
+        },
+        {
+          "url": "http://localhost:3000/_next/static/chunks/0yek_%40base-ui_utils_esm_useRefWithInit_0j5l0~x.js",
+          "method": "GET",
+          "status": 200,
+          "duration": 58.539,
+          "resourceType": "script",
+          "timestamp": 1776258164334,
+          "flagged": false
+        },
+        {
+          "url": "http://localhost:3000/_next/static/chunks/agent-hub_src_app_page_tsx_0pwb2kt._.js",
+          "method": "GET",
+          "status": 200,
+          "duration": 57.692,
+          "resourceType": "script",
+          "timestamp": 1776258164334,
+          "flagged": false
+        },
+        {
+          "url": "http://localhost:3000/_next/static/chunks/0yek_next_dist_compiled_react-dom_0smpcf9._.js",
+          "method": "GET",
+          "status": 200,
+          "duration": 64.149,
+          "resourceType": "script",
+          "timestamp": 1776258164335,
+          "flagged": false
+        },
+        {
+          "url": "http://localhost:3000/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_0j9n8dx._.js",
+          "method": "GET",
+          "status": 200,
+          "duration": 3.754,
+          "resourceType": "script",
+          "timestamp": 1776258164419,
+          "flagged": false
+        },
+        {
+          "url": "http://localhost:3000/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_0yjw1oe._.js",
+          "method": "GET",
+          "status": 200,
+          "duration": 5.186,
+          "resourceType": "script",
+          "timestamp": 1776258164419,
+          "flagged": false
+        },
+        {
+          "url": "http://localhost:3000/",
+          "method": "GET",
+          "status": 200,
+          "duration": 1346.461,
+          "resourceType": "document",
+          "timestamp": 1776258165559,
+          "flagged": false
+        }
+      ],
+      "accessibility": {
+        "violations": [
+          {
+            "id": "color-contrast",
+            "impact": "serious",
+            "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+            "helpUrl": "https://dequeuniversity.com/rules/axe/4.11/color-contrast?application=playwright",
+            "nodes": 1
+          }
+        ],
+        "passes": 30,
+        "incomplete": 0
+      },
+      "performance": {
+        "lcp": 1392,
+        "cls": 0,
+        "fid": null,
+        "ttfb": 50
+      },
+      "screenshot": "/Users/rogerconnolly/dev/Projects/agent-hub/ux-journey-screenshots/step-1-land-on-projects-dashboard.png",
+      "url": "http://localhost:3000/",
+      "title": "Agent Hub",
+      "duration": 2609
+    },
+    {
+      "id": 2,
+      "description": "Click agent-hub project card to drill into project detail",
+      "action": "click",
+      "status": "warn",
+      "errors": [
+        "Expected element \"h1\" not found",
+        "Expected element \"h2\" not found"
+      ],
+      "consoleLogs": [],
+      "networkRequests": [],
+      "accessibility": {
+        "violations": [
+          {
+            "id": "page-has-heading-one",
+            "impact": "moderate",
+            "description": "Ensure that the page, or at least one of its frames contains a level-one heading",
+            "helpUrl": "https://dequeuniversity.com/rules/axe/4.11/page-has-heading-one?application=playwright",
+            "nodes": 1
+          }
+        ],
+        "passes": 27,
+        "incomplete": 0
+      },
+      "performance": {
+        "lcp": 1392,
+        "cls": 0,
+        "fid": 5.200000047683716,
+        "ttfb": 50
+      },
+      "screenshot": "/Users/rogerconnolly/dev/Projects/agent-hub/ux-journey-screenshots/step-2-click-agent-hub-project-card-to-drill-into-project-detail.png",
+      "url": "http://localhost:3000/projects/571cc5af-cb4d-4650-9eea-452dfb11f875",
+      "title": "agent-hub — Agent Hub",
+      "duration": 643
+    },
+    {
+      "id": 3,
+      "description": "Scroll to see run history list",
+      "action": "scroll",
+      "status": "pass",
+      "errors": [],
+      "consoleLogs": [],
+      "networkRequests": [
+        {
+          "url": "http://localhost:3000/_next/static/chunks/0yek_013ck9k._.js",
+          "method": "GET",
+          "status": 304,
+          "duration": 3.286,
+          "resourceType": "script",
+          "timestamp": 1776258167495,
+          "flagged": false
+        },
+        {
+          "url": "http://localhost:3000/_next/static/chunks/agent-hub_src_0k_abaq._.js",
+          "method": "GET",
+          "status": 304,
+          "duration": 3.965,
+          "resourceType": "script",
+          "timestamp": 1776258167495,
+          "flagged": false
+        },
+        {
+          "url": "http://localhost:3000/_next/static/chunks/agent-hub_src_app_projects_%5Bid%5D_page_tsx_0pwb2kt._.js",
+          "method": "GET",
+          "status": 304,
+          "duration": 3.8369999999999997,
+          "resourceType": "script",
+          "timestamp": 1776258167495,
+          "flagged": false
+        }
+      ],
+      "accessibility": {
+        "violations": [],
+        "passes": 32,
+        "incomplete": 0
+      },
+      "performance": {
+        "lcp": 1392,
+        "cls": 0,
+        "fid": 5.200000047683716,
+        "ttfb": 50
+      },
+      "screenshot": "/Users/rogerconnolly/dev/Projects/agent-hub/ux-journey-screenshots/step-3-scroll-to-see-run-history-list.png",
+      "url": "http://localhost:3000/projects/571cc5af-cb4d-4650-9eea-452dfb11f875",
+      "title": "agent-hub — Agent Hub",
+      "duration": 1146
+    },
+    {
+      "id": 4,
+      "description": "Click first run card to view run detail",
+      "action": "click",
+      "status": "warn",
+      "errors": [
+        "Expected element \"h1\" not found",
+        "Expected element \"article\" not found"
+      ],
+      "consoleLogs": [],
+      "networkRequests": [
+        {
+          "url": "http://localhost:3000/__nextjs_font/geist-latin.woff2",
+          "method": "GET",
+          "status": 200,
+          "duration": 192.832,
+          "resourceType": "font",
+          "timestamp": 1776258169211,
+          "flagged": false
+        }
+      ],
+      "accessibility": {
+        "violations": [
+          {
+            "id": "page-has-heading-one",
+            "impact": "moderate",
+            "description": "Ensure that the page, or at least one of its frames contains a level-one heading",
+            "helpUrl": "https://dequeuniversity.com/rules/axe/4.11/page-has-heading-one?application=playwright",
+            "nodes": 1
+          }
+        ],
+        "passes": 28,
+        "incomplete": 0
+      },
+      "performance": {
+        "lcp": 1392,
+        "cls": 0,
+        "fid": 5.200000047683716,
+        "ttfb": 50
+      },
+      "screenshot": "/Users/rogerconnolly/dev/Projects/agent-hub/ux-journey-screenshots/step-4-click-first-run-card-to-view-run-detail.png",
+      "url": "http://localhost:3000/runs/45d5b73e-2206-4a36-ae3c-c69539156897",
+      "title": "Visual Design Review — agent-hub — Agent Hub",
+      "duration": 1244
+    },
+    {
+      "id": 5,
+      "description": "Scroll through run report content",
+      "action": "scroll",
+      "status": "pass",
+      "errors": [],
+      "consoleLogs": [],
+      "networkRequests": [
+        {
+          "url": "http://localhost:3000/_next/static/chunks/0yek_next_07v.ts3._.js",
+          "method": "GET",
+          "status": 304,
+          "duration": 6.109999999999999,
+          "resourceType": "script",
+          "timestamp": 1776258169842,
+          "flagged": false
+        },
+        {
+          "url": "http://localhost:3000/_next/static/chunks/0yek_micromark-core-commonmark_dev_lib_0fkcz-o._.js",
+          "method": "GET",
+          "status": 304,
+          "duration": 6.388,
+          "resourceType": "script",
+          "timestamp": 1776258169842,
+          "flagged": false
+        },
+        {
+          "url": "http://localhost:3000/_next/static/chunks/0yek_parse5_dist_0uumul8._.js",
+          "method": "GET",
+          "status": 304,
+          "duration": 5.984999999999999,
+          "resourceType": "script",
+          "timestamp": 1776258169843,
+          "flagged": false
+        },
+        {
+          "url": "http://localhost:3000/_next/static/chunks/0yek_0ihfvt2._.js",
+          "method": "GET",
+          "status": 304,
+          "duration": 7.005,
+          "resourceType": "script",
+          "timestamp": 1776258169843,
+          "flagged": false
+        },
+        {
+          "url": "http://localhost:3000/_next/static/chunks/agent-hub_src_components_0afe.9~._.js",
+          "method": "GET",
+          "status": 304,
+          "duration": 6.64,
+          "resourceType": "script",
+          "timestamp": 1776258169843,
+          "flagged": false
+        },
+        {
+          "url": "http://localhost:3000/_next/static/chunks/agent-hub_src_app_runs_%5Bid%5D_page_tsx_0pwb2kt._.js",
+          "method": "GET",
+          "status": 304,
+          "duration": 6.426,
+          "resourceType": "script",
+          "timestamp": 1776258169843,
+          "flagged": false
+        }
+      ],
+      "accessibility": {
+        "violations": [
+          {
+            "id": "heading-order",
+            "impact": "moderate",
+            "description": "Ensure the order of headings is semantically correct",
+            "helpUrl": "https://dequeuniversity.com/rules/axe/4.11/heading-order?application=playwright",
+            "nodes": 1
+          },
+          {
+            "id": "image-redundant-alt",
+            "impact": "minor",
+            "description": "Ensure image alternative is not repeated as text",
+            "helpUrl": "https://dequeuniversity.com/rules/axe/4.11/image-redundant-alt?application=playwright",
+            "nodes": 5
+          },
+          {
+            "id": "landmark-unique",
+            "impact": "moderate",
+            "description": "Ensure landmarks are unique",
+            "helpUrl": "https://dequeuniversity.com/rules/axe/4.11/landmark-unique?application=playwright",
+            "nodes": 2
+          }
+        ],
+        "passes": 40,
+        "incomplete": 1
+      },
+      "performance": {
+        "lcp": 1392,
+        "cls": 0,
+        "fid": 5.200000047683716,
+        "ttfb": 50
+      },
+      "screenshot": "/Users/rogerconnolly/dev/Projects/agent-hub/ux-journey-screenshots/step-5-scroll-through-run-report-content.png",
+      "url": "http://localhost:3000/runs/45d5b73e-2206-4a36-ae3c-c69539156897",
+      "title": "Visual Design Review — agent-hub — Agent Hub",
+      "duration": 1546
+    }
+  ],
+  "summary": {
+    "totalSteps": 5,
+    "completed": 5,
+    "passed": 3,
+    "warned": 2,
+    "failed": 0,
+    "totalConsoleErrors": 0,
+    "totalNetworkIssues": 0,
+    "totalA11yViolations": 6,
+    "overallStatus": "NEEDS WORK"
+  },
+  "completedAt": "2026-04-15T13:02:51.388Z"
+}
