@@ -37,6 +37,17 @@ function normalizePath(path: string): string {
   return path.replace(/\\/g, "/").replace(/^\.?\//, "");
 }
 
+function basename(path: string): string {
+  const normalized = normalizePath(path);
+  const parts = normalized.split("/");
+  return parts[parts.length - 1] ?? normalized;
+}
+
+function tailPath(path: string, segments: number): string {
+  const parts = normalizePath(path).split("/");
+  return parts.slice(Math.max(parts.length - segments, 0)).join("/");
+}
+
 type TableEl = React.DetailedHTMLProps<
   React.TableHTMLAttributes<HTMLTableElement>,
   HTMLTableElement
@@ -217,9 +228,29 @@ export function ContentBundleViewer({
   const selectedFile = selectedPath
     ? manifest.files.find((f) => f.path === selectedPath)
     : null;
-  const selectedContent = selectedPath
-    ? (contentByPath.get(selectedPath) ?? contentByPath.get(normalizePath(selectedPath)) ?? null)
-    : null;
+  const selectedContent = (() => {
+    if (!selectedPath) return null;
+
+    const exact = contentByPath.get(selectedPath);
+    if (exact) return exact;
+
+    const normalized = normalizePath(selectedPath);
+    const normalizedMatch = contentByPath.get(normalized);
+    if (normalizedMatch) return normalizedMatch;
+
+    const base = basename(selectedPath);
+    const basenameMatch = contentByPath.get(base);
+    if (basenameMatch) return basenameMatch;
+
+    // Legacy bundle uploads may omit leading directories (e.g. docs/foo.md -> foo.md).
+    const byTailTwo = contentByPath.get(tailPath(selectedPath, 2));
+    if (byTailTwo) return byTailTwo;
+
+    const byTailThree = contentByPath.get(tailPath(selectedPath, 3));
+    if (byTailThree) return byTailThree;
+
+    return null;
+  })();
 
   return (
     <div className="mt-8">
