@@ -9,7 +9,7 @@ import {
   findings as findingsTable,
 } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-import { put } from "@vercel/blob";
+import { putBlob } from "@/lib/blob-put";
 import {
   parseReportForIngest,
   parseSkillParserOverride,
@@ -27,6 +27,9 @@ import {
   type ContentBundleManifest,
 } from "@/lib/parsers/content-bundle";
 import { parseRunDetailContract } from "@/lib/run-detail-contract";
+
+/** Ingest can upload many blobs; keep below your Vercel plan’s function max. */
+export const maxDuration = 300;
 
 function isBlobLike(
   v: unknown
@@ -235,7 +238,7 @@ async function ingestReportArtifact(opts: {
       })
     : parsed.executiveSummary;
 
-  const reportBlob = await put(
+  const reportBlob = await putBlob(
     `${project.name}/${skillType}/report-${Date.now()}.md`,
     reportMarkdown,
     { access: "public", contentType: "text/markdown", addRandomSuffix: true }
@@ -294,7 +297,7 @@ async function ingestReportArtifact(opts: {
     if (key.startsWith("screenshot:") && isBlobLike(value)) {
       const filename =
         value instanceof File ? value.name : key.slice("screenshot:".length);
-      const blob = await put(
+      const blob = await putBlob(
         `${project.name}/${skillType}/screenshots/${filename}`,
         value,
         {
@@ -319,7 +322,7 @@ async function ingestReportArtifact(opts: {
       const filename =
         value instanceof File ? value.name : key.slice("config:".length);
       const configContent = await value.text();
-      const blob = await put(
+      const blob = await putBlob(
         `${project.name}/${skillType}/configs/${filename}`,
         configContent,
         {
@@ -341,7 +344,7 @@ async function ingestReportArtifact(opts: {
     if (key === "journeyMap" && isBlobLike(value)) {
       const filename = value instanceof File ? value.name : "journey-map.md";
       const mapContent = await value.text();
-      const blob = await put(
+      const blob = await putBlob(
         `${project.name}/${skillType}/journey-map-${Date.now()}.md`,
         mapContent,
         { access: "public", contentType: "text/markdown", addRandomSuffix: true }
@@ -439,7 +442,7 @@ async function ingestContentBundle(opts: {
       })
     : parsed.executiveSummary;
 
-  const manifestBlob = await put(
+  const manifestBlob = await putBlob(
     `${project.name}/${skillType}/bundle/manifest-${Date.now()}.json`,
     JSON.stringify(manifest, null, 2),
     { access: "public", contentType: "application/json", addRandomSuffix: true }
@@ -470,7 +473,7 @@ async function ingestContentBundle(opts: {
     role: "manifest",
   });
 
-  const reportBlob = await put(
+  const reportBlob = await putBlob(
     `${project.name}/${skillType}/report-${Date.now()}.md`,
     reportBody,
     { access: "public", contentType: "text/markdown", addRandomSuffix: true }
@@ -506,7 +509,7 @@ async function ingestContentBundle(opts: {
       uploadBody = Buffer.from(await value.arrayBuffer());
     }
 
-    const blob = await put(
+    const blob = await putBlob(
       `${project.name}/${skillType}/bundle/${relPath.replace(/^\//, "")}`,
       uploadBody,
       { access: "public", contentType: mime, addRandomSuffix: true }
