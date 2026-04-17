@@ -1,4 +1,5 @@
 export type RecommendationPriority = "P1" | "P2" | "P3" | "P4" | "P5";
+export type RecommendationEffortImpact = "S" | "M" | "L";
 
 export interface TopRecommendation {
   priority: RecommendationPriority;
@@ -6,6 +7,18 @@ export interface TopRecommendation {
   action: string;
   rationale?: string;
   severity?: "critical" | "warning" | "info" | "low" | "investigate";
+  /** Rough effort scale. S < 1 day, M 1-5 days, L > 1 week / cross-team. */
+  effort?: RecommendationEffortImpact;
+  /** Rough impact scale. S = incremental, M = broad, L = step-change. */
+  impact?: RecommendationEffortImpact;
+  /** One sentence: what changes once this is done. */
+  expectedOutcome?: string;
+  /** Observable, measurable completion signal. */
+  successMetric?: string;
+  /** Finding ids this recommendation addresses (matches ids referenced in the markdown report). */
+  relatedFindings?: string[];
+  /** Primary file paths the change touches. */
+  affectedFiles?: string[];
 }
 
 export interface TopRecommendationsPayloadV1 {
@@ -140,6 +153,23 @@ function parsePriority(input: unknown): RecommendationPriority | null {
     : null;
 }
 
+function parseEffortImpact(input: unknown): RecommendationEffortImpact | undefined {
+  if (typeof input !== "string") return undefined;
+  const normalized = input.trim().toUpperCase();
+  return normalized === "S" || normalized === "M" || normalized === "L"
+    ? (normalized as RecommendationEffortImpact)
+    : undefined;
+}
+
+function parseStringArray(input: unknown): string[] | undefined {
+  if (!Array.isArray(input)) return undefined;
+  const result = input
+    .filter((v): v is string => typeof v === "string")
+    .map((v) => v.trim())
+    .filter((v) => v.length > 0);
+  return result.length > 0 ? result : undefined;
+}
+
 export function parseTopRecommendationsPayload(
   raw: unknown
 ): TopRecommendationsPayloadV1 | null {
@@ -176,6 +206,18 @@ export function parseTopRecommendationsPayload(
       rationale:
         typeof obj.rationale === "string" ? obj.rationale.trim() : undefined,
       severity,
+      effort: parseEffortImpact(obj.effort),
+      impact: parseEffortImpact(obj.impact),
+      expectedOutcome:
+        typeof obj.expectedOutcome === "string"
+          ? obj.expectedOutcome.trim() || undefined
+          : undefined,
+      successMetric:
+        typeof obj.successMetric === "string"
+          ? obj.successMetric.trim() || undefined
+          : undefined,
+      relatedFindings: parseStringArray(obj.relatedFindings),
+      affectedFiles: parseStringArray(obj.affectedFiles),
     });
   }
 

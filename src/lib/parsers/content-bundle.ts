@@ -8,11 +8,20 @@ import {
 
 /** Minimal manifest shape from generative skills (_manifest.json). */
 export interface ContentBundleManifest {
+  /** Optional forward-compat marker. Server ignores but accepts. Current: "1.0". */
+  schemaVersion?: string;
   skillType?: string;
   mode?: string;
   generatedAt?: string;
   summary: string;
-  files: { path: string; title: string; category?: string; description?: string }[];
+  files: {
+    path: string;
+    title: string;
+    category?: string;
+    description?: string;
+    /** Optional free-form search tags for the Hub's content index. */
+    tags?: string[];
+  }[];
   auditReport?: string;
 }
 
