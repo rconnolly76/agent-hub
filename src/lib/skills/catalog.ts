@@ -61,6 +61,22 @@ export const SKILL_CATALOG: SkillCatalogEntry[] = [
     screenshotDir: "visual-review-screenshots",
   },
   {
+    skill: "feature-roadmap",
+    kind: "report",
+    skillFamily: "discovery",
+    reportFile: "feature-roadmap.md",
+    runDetailContractFile: "_run-detail-contract.json",
+    topRecommendationsFile: "_top-5-recommendations.json",
+  },
+  {
+    skill: "product-backlog",
+    kind: "report",
+    skillFamily: "discovery",
+    reportFile: "product-backlog.md",
+    runDetailContractFile: "_run-detail-contract.json",
+    topRecommendationsFile: "_top-5-recommendations.json",
+  },
+  {
     skill: "code-quality-audit",
     kind: "report",
     skillFamily: "audit",

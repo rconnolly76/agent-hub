@@ -12,6 +12,8 @@ import {
   listSuiteSnapshots,
   rollupSuiteFindings,
 } from "@/lib/suites";
+import { getProjectStrategyRoadmap } from "@/lib/project-strategy-roadmap";
+import { ProjectStrategyRoadmapSection } from "@/components/ProjectStrategyRoadmap";
 
 export const dynamic = "force-dynamic";
 
@@ -88,6 +90,8 @@ export default async function ProjectDetailPage({
   });
 
   if (!project) return notFound();
+
+  const strategySnapshot = await getProjectStrategyRoadmap(id);
 
   const suiteSnapshots = await listSuiteSnapshots(id);
   const suiteCards = await Promise.all(
@@ -221,6 +225,10 @@ export default async function ProjectDetailPage({
       </div>
 
       <Separator className="my-8" />
+
+      {strategySnapshot ? (
+        <ProjectStrategyRoadmapSection data={strategySnapshot} />
+      ) : null}
 
       {suiteCards.length > 0 && (
         <div className="mb-10 space-y-3">

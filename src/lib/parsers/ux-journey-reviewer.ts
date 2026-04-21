@@ -19,6 +19,9 @@ export interface ParsedFinding {
     owner?: string;
     effort?: string;
     doneWhen?: string;
+    /** Strategic theme / ownership area (roadmap) or epic name (backlog). */
+    theme?: string;
+    epic?: string;
   };
 }
 
@@ -126,32 +129,63 @@ function extractMetrics(md: string): ParsedMetric[] {
   return metrics;
 }
 
-function extractFindings(md: string): ParsedFinding[] {
-  const findings: ParsedFinding[] = [];
-  const recSection = md.match(/## Recommendations\s*\n([\s\S]*?)(?=\n## |$)/);
-  if (!recSection) return findings;
+function severityFromGroupHeader(fullSectionText: string, block: string): string {
+  const fullSeverity = findPrecedingSeverityHeader(fullSectionText, block);
+  if (fullSeverity.includes("🔴") || fullSeverity.includes("Fix immediately"))
+    return "critical";
+  if (fullSeverity.includes("🟡") || fullSeverity.includes("Fix soon"))
+    return "warning";
+  if (fullSeverity.includes("🔵") || fullSeverity.includes("Next sprint")) return "info";
+  if (fullSeverity.includes("⚪") || fullSeverity.includes("Backlog")) return "low";
+  if (fullSeverity.includes("🔍") || fullSeverity.includes("Investigate"))
+    return "investigate";
+  return "info";
+}
 
-  const text = recSection[1];
-  const blocks = text.split(/(?=\*\*R\d+\.)/);
+/**
+ * Parses `## Recommendations` with **R1.** … **R{n}.** blocks, or
+ * `## Top 5 Recommendations` / `## Top Recommendations` with **P1.** … **P5.** blocks.
+ */
+function extractFindings(md: string): ParsedFinding[] {
+  const rSection = md.match(/## Recommendations\s*\n([\s\S]*?)(?=\n## |$)/);
+  if (rSection) {
+    const fromR = parseNumberedRecommendationBlocks(
+      rSection[1],
+      /(?=\*\*R\d+\.)/,
+      /\*\*R\d+\.\s*(.+?)\*\*/
+    );
+    if (fromR.length > 0) return fromR;
+  }
+
+  const pSection = md.match(
+    /## Top (?:5 )?Recommendations\s*\n([\s\S]*?)(?=\n## |$)/
+  );
+  if (pSection) {
+    const fromP = parseNumberedRecommendationBlocks(
+      pSection[1],
+      /(?=\*\*P[1-5]\.)/,
+      /\*\*P[1-5]\.\s*(.+?)\*\*/
+    );
+    if (fromP.length > 0) return fromP;
+  }
+
+  return [];
+}
+
+function parseNumberedRecommendationBlocks(
+  sectionBody: string,
+  blockBoundary: RegExp,
+  titleLine: RegExp
+): ParsedFinding[] {
+  const findings: ParsedFinding[] = [];
+  const blocks = sectionBody.split(blockBoundary);
 
   for (const block of blocks) {
-    const titleMatch = block.match(/\*\*R\d+\.\s*(.+?)\*\*/);
+    const titleMatch = block.match(titleLine);
     if (!titleMatch) continue;
 
     const title = titleMatch[1].trim();
-
-    let severity = "info";
-    const fullSeverity = findPrecedingSeverityHeader(text, block);
-    if (fullSeverity.includes("🔴") || fullSeverity.includes("Fix immediately"))
-      severity = "critical";
-    else if (fullSeverity.includes("🟡") || fullSeverity.includes("Fix soon"))
-      severity = "warning";
-    else if (fullSeverity.includes("🔵") || fullSeverity.includes("Next sprint"))
-      severity = "info";
-    else if (fullSeverity.includes("⚪") || fullSeverity.includes("Backlog"))
-      severity = "low";
-    else if (fullSeverity.includes("🔍") || fullSeverity.includes("Investigate"))
-      severity = "investigate";
+    const severity = severityFromGroupHeader(sectionBody, block);
 
     const whatMatch = block.match(/- \*\*What:\*\*\s*([\s\S]*?)(?=\n- \*\*|$)/);
     const whyMatch = block.match(/- \*\*Why[^*]*\*\*\s*([\s\S]*?)(?=\n- \*\*|$)/);

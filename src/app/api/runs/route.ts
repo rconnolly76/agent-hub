@@ -32,6 +32,7 @@ import {
   parseSuiteFieldsFromFormData,
 } from "@/lib/suite-metadata";
 import { skillFamilyForSkillType } from "@/lib/skills/catalog";
+import { mergeFindingsWithTopRecommendations } from "@/lib/parsers/findings-from-top-recommendations";
 
 /** Ingest can upload many blobs; keep below your Vercel plan’s function max. */
 export const maxDuration = 300;
@@ -249,10 +250,14 @@ async function ingestReportArtifact(opts: {
     override,
   });
   const topRecommendations = providedTopRecommendations;
+  const findingsForRun = mergeFindingsWithTopRecommendations(
+    parsed.findings,
+    topRecommendations
+  );
   const executiveSummary = topRecommendations
     ? ensureExecutiveSummaryWithNextSteps(parsed.executiveSummary, {
         skillType,
-        findings: parsed.findings,
+        findings: findingsForRun,
         metrics: parsed.metrics,
         topRecommendations: topRecommendations.recommendations,
       })
@@ -303,9 +308,9 @@ async function ingestReportArtifact(opts: {
     );
   }
 
-  if (parsed.findings.length > 0) {
+  if (findingsForRun.length > 0) {
     await db.insert(findingsTable).values(
-      parsed.findings.map((f) => ({
+      findingsForRun.map((f) => ({
         runId: run.id,
         severity: f.severity,
         title: f.title,
@@ -392,7 +397,7 @@ async function ingestReportArtifact(opts: {
       skillType,
       artifactType: "report",
       metrics: parsed.metrics.length,
-      findings: parsed.findings.length,
+      findings: findingsForRun.length,
       screenshots: uploadedScreenshots.length,
       url: `/runs/${run.id}`,
     },
@@ -462,10 +467,14 @@ async function ingestContentBundle(opts: {
     auditMarkdown?.trim() ? auditMarkdown : buildSyntheticBundleReport(manifest);
   const reportName = auditMarkdown?.trim() ? auditFilename : "bundle-overview.md";
   const topRecommendations = providedTopRecommendations;
+  const findingsForBundle = mergeFindingsWithTopRecommendations(
+    parsed.findings,
+    topRecommendations
+  );
   const executiveSummary = topRecommendations
     ? ensureExecutiveSummaryWithNextSteps(parsed.executiveSummary, {
         skillType: effectiveSkillType,
-        findings: parsed.findings,
+        findings: findingsForBundle,
         metrics: parsed.metrics,
         topRecommendations: topRecommendations.recommendations,
       })
@@ -602,9 +611,9 @@ async function ingestContentBundle(opts: {
     );
   }
 
-  if (parsed.findings.length > 0) {
+  if (findingsForBundle.length > 0) {
     await db.insert(findingsTable).values(
-      parsed.findings.map((f) => ({
+      findingsForBundle.map((f) => ({
         runId: run.id,
         severity: f.severity,
         title: f.title,
@@ -622,7 +631,7 @@ async function ingestContentBundle(opts: {
       skillType,
       artifactType: "content-bundle",
       metrics: parsed.metrics.length,
-      findings: parsed.findings.length,
+      findings: findingsForBundle.length,
       contentFiles: contentFiles.length,
       url: `/runs/${run.id}`,
     },
