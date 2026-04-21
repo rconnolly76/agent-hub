@@ -10,6 +10,7 @@ import {
   CardContent,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { listSuiteSnapshots, rollupSuiteFindings } from "@/lib/suites";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,14 @@ interface ProjectWithStats {
   name: string;
   repoUrl: string | null;
   createdAt: Date;
+  /** Present when at least one ingested run used `suiteRunId` (suite batch). */
+  latestSuite: {
+    suiteRunId: string;
+    suiteCompletedAt: Date;
+    totalFindings: number;
+    critical: number;
+    warning: number;
+  } | null;
   latestRun: {
     id: string;
     skillType: string;
@@ -105,7 +114,12 @@ async function getProjectsWithStats(): Promise<ProjectWithStats[]> {
     findingsByRun.set(f.runId, Number(f.count));
   }
 
-  return allProjects.map((project) => {
+  const suiteLists = await Promise.all(
+    allProjects.map((p) => listSuiteSnapshots(p.id))
+  );
+
+  return Promise.all(
+    allProjects.map(async (project, projectIndex) => {
     const projectRuns = runsByProject.get(project.id) ?? [];
     let latestRun: ProjectWithStats["latestRun"] = null;
 
@@ -164,31 +178,67 @@ async function getProjectsWithStats(): Promise<ProjectWithStats[]> {
           )
         : null;
 
+    const suites = suiteLists[projectIndex] ?? [];
+    let latestSuite: ProjectWithStats["latestSuite"] = null;
+    if (suites[0]) {
+      const roll = await rollupSuiteFindings(suites[0]);
+      latestSuite = {
+        suiteRunId: suites[0].suiteRunId,
+        suiteCompletedAt: suites[0].suiteCompletedAt,
+        totalFindings: roll.totalFindings,
+        critical: roll.critical,
+        warning: roll.warning,
+      };
+    }
+
     return {
       id: project.id,
       name: project.name,
       repoUrl: project.repoUrl,
       createdAt: project.createdAt,
+      latestSuite,
       latestRun,
       runCount: projectRuns.length,
       skillHealth,
       healthScore,
     };
-  });
+    })
+  );
 }
 
 function getHealthBadge(project: ProjectWithStats) {
-  if (!project.latestRun) {
+  if (!project.latestRun && !project.latestSuite) {
     return <Badge variant="outline">No runs</Badge>;
   }
-  if (project.latestRun.criticalCount > 0) {
+  if (project.latestSuite) {
+    if (project.latestSuite.critical > 0) {
+      return (
+        <Badge className="bg-red-500/15 text-red-400 border-red-500/25">
+          Suite · {project.latestSuite.critical} critical
+        </Badge>
+      );
+    }
+    if (project.latestSuite.warning > 0) {
+      return (
+        <Badge className="bg-amber-500/15 text-amber-400 border-amber-500/25">
+          Suite · {project.latestSuite.warning} warnings
+        </Badge>
+      );
+    }
+    return (
+      <Badge className="bg-emerald-500/15 text-emerald-400 border-emerald-500/25">
+        Suite · healthy
+      </Badge>
+    );
+  }
+  if (project.latestRun && project.latestRun.criticalCount > 0) {
     return (
       <Badge className="bg-red-500/15 text-red-400 border-red-500/25">
         {project.latestRun.criticalCount} critical
       </Badge>
     );
   }
-  if (project.latestRun.warningCount > 0) {
+  if (project.latestRun && project.latestRun.warningCount > 0) {
     return (
       <Badge className="bg-amber-500/15 text-amber-400 border-amber-500/25">
         {project.latestRun.warningCount} warnings
@@ -281,13 +331,22 @@ export default async function HomePage() {
                     <span>
                       {project.runCount} run{project.runCount !== 1 ? "s" : ""}
                     </span>
-                    {project.latestRun && (
-                      <span className="flex items-center gap-1.5">
+                    {project.latestSuite ? (
+                      <span className="flex items-center gap-1.5 text-right">
                         <span className="text-xs px-1.5 py-0.5 rounded bg-muted font-mono">
-                          {formatSkillType(project.latestRun.skillType)}
+                          Last suite
                         </span>
-                        <span>{timeAgo(project.latestRun.createdAt)}</span>
+                        <span>{timeAgo(project.latestSuite.suiteCompletedAt)}</span>
                       </span>
+                    ) : (
+                      project.latestRun && (
+                        <span className="flex items-center gap-1.5">
+                          <span className="text-xs px-1.5 py-0.5 rounded bg-muted font-mono">
+                            {formatSkillType(project.latestRun.skillType)}
+                          </span>
+                          <span>{timeAgo(project.latestRun.createdAt)}</span>
+                        </span>
+                      )
                     )}
                   </div>
 

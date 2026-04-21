@@ -8,11 +8,15 @@
  *   node agent-hub-push.mjs --endpoint http://localhost:3000 --key sk_xxx --project my-app --skill ux-journey-reviewer
  *   node agent-hub-push.mjs ... --content-dir product-marketing --skill product-marketer
  *
+ * Suite batching: pass the same --suite-run-id UUID for every push in a suite (optional).
+ * Or set AGENT_HUB_SUITE_RUN_ID in the environment. Use --print-suite-id to emit a fresh UUID for shell scripts.
+ *
  * Optional: include `_run-detail-contract.json` to enrich Run Detail right-rail section health.
  */
 
 import fs from "node:fs";
 import path from "node:path";
+import crypto from "node:crypto";
 
 const args = process.argv.slice(2);
 
@@ -27,13 +31,57 @@ const explicitSkill = getArg("skill");
 const explicitProject = getArg("project");
 const parserOverrideRaw = getArg("parser-override");
 const contentDirArg = getArg("content-dir");
+const suiteRunIdArg = getArg("suite-run-id");
+const suitePhaseArg = getArg("suite-phase");
+const suiteOrderArg = getArg("suite-order");
+const commitShaArg = getArg("commit-sha");
+const versionArg = getArg("version");
+const skillFamilyArg = getArg("skill-family");
+const printSuiteId = args.includes("--print-suite-id");
 const TOP_RECOMMENDATIONS_FILENAME = "_top-5-recommendations.json";
+
+if (printSuiteId) {
+  console.log(crypto.randomUUID());
+  process.exit(0);
+}
 
 if (!endpoint || !apiKey) {
   console.error(
-    "Usage: agent-hub-push --endpoint <url> --key <api-key> [--project <name>] [--skill <type>] [--parser-override <json>] [--content-dir <dir>]"
+    "Usage: agent-hub-push --endpoint <url> --key <api-key> [--project <name>] [--skill <type>] [--parser-override <json>] [--content-dir <dir>] [--suite-run-id <uuid>] [--suite-phase N] [--suite-order N] [--commit-sha <sha>] [--version <semver>] [--skill-family audit|browser|...] [--print-suite-id]"
   );
   process.exit(1);
+}
+
+/**
+ * Append optional suite metadata so Agent Hub can group runs into one snapshot.
+ */
+function appendSuiteMetadata(formData) {
+  const envSuite = process.env.AGENT_HUB_SUITE_RUN_ID?.trim();
+  const suiteId = suiteRunIdArg || envSuite || null;
+  if (suiteId) {
+    formData.append("suiteRunId", suiteId);
+    console.log(`  + suiteRunId: ${suiteId}`);
+  }
+  if (suitePhaseArg) {
+    formData.append("suitePhase", suitePhaseArg);
+    console.log(`  + suitePhase: ${suitePhaseArg}`);
+  }
+  if (suiteOrderArg) {
+    formData.append("suiteOrder", suiteOrderArg);
+    console.log(`  + suiteOrder: ${suiteOrderArg}`);
+  }
+  if (commitShaArg) {
+    formData.append("commitSha", commitShaArg);
+    console.log(`  + commitSha: ${commitShaArg.slice(0, 12)}…`);
+  }
+  if (versionArg) {
+    formData.append("version", versionArg);
+    console.log(`  + version: ${versionArg}`);
+  }
+  if (skillFamilyArg) {
+    formData.append("skillFamily", skillFamilyArg);
+    console.log(`  + skillFamily: ${skillFamilyArg}`);
+  }
 }
 
 /** Content-bundle skills: directory contains _manifest.json */
@@ -286,6 +334,7 @@ async function push() {
       formData.append("skillParserOverride", parserOverrideRaw);
       console.log(`  + skillParserOverride: ${parserOverrideRaw}`);
     }
+    appendSuiteMetadata(formData);
     appendContentBundle(formData, contentDirArg, cwd);
   } else {
     const skillType = explicitSkill || detectSkillType(cwd);
@@ -314,6 +363,8 @@ async function push() {
       formData.append("skillParserOverride", parserOverrideRaw);
       console.log(`  + skillParserOverride: ${parserOverrideRaw}`);
     }
+
+    appendSuiteMetadata(formData);
 
     appendRunDetailContractIfPresent(
       formData,

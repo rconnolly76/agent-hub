@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { RunDetailContractV1, RunSectionHealth } from "@/lib/run-detail-contract";
+import type { SkillFamily } from "@/lib/suite-metadata";
 
 interface Metric {
   key: string;
@@ -20,6 +21,10 @@ interface MetricsSidebarProps {
   skillType: string;
   runDetailContract?: RunDetailContractV1 | null;
   linkSections?: boolean;
+  /** From catalog / ingest; drives which metric groups render. */
+  skillFamily?: SkillFamily | null;
+  /** When main column already lists findings (triage), omit duplicate list here. */
+  omitFindingsList?: boolean;
 }
 
 const METRIC_LABELS: Record<string, string> = {
@@ -123,12 +128,20 @@ function levelText(level: RunSectionHealth["level"]): string {
   }
 }
 
+function healthCardTitle(family: SkillFamily | null | undefined): string {
+  if (family === "content") return "Signals";
+  if (family === "discovery") return "Overview";
+  return "Health";
+}
+
 export function MetricsSidebar({
   metrics,
   findings,
   skillType,
   runDetailContract = null,
   linkSections = true,
+  skillFamily = null,
+  omitFindingsList = false,
 }: MetricsSidebarProps) {
   const healthMetrics = metrics.filter((m) =>
     ["severity_critical", "severity_warning", "severity_passing"].includes(m.key)
@@ -147,6 +160,16 @@ export function MetricsSidebar({
   const summaryMetrics = metrics.filter((m) =>
     ["synthesized_findings", "recommendations_count"].includes(m.key)
   );
+
+  const showCoverageCard =
+    coverageMetrics.length > 0 &&
+    (skillFamily === "browser" ||
+      skillFamily === "discovery" ||
+      skillFamily === null ||
+      skillFamily === "audit");
+
+  const showHealthCard = skillFamily !== "content" || healthMetrics.length > 0;
+
   const sections = runDetailContract?.sections ?? [];
   const sectionHealthCounts = sections.reduce(
     (acc, section) => {
@@ -161,9 +184,12 @@ export function MetricsSidebar({
 
   return (
     <div className="space-y-4">
+      {showHealthCard && (
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Health</CardTitle>
+          <CardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            {healthCardTitle(skillFamily)}
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="mb-2">
@@ -171,13 +197,18 @@ export function MetricsSidebar({
               {skillType}
             </span>
           </div>
+          {healthMetrics.length > 0 ? (
           <div className="divide-y divide-border">
             {healthMetrics.map((m) => (
               <MetricRow key={m.key} metric={m} />
             ))}
           </div>
+          ) : (
+            <p className="text-[11px] text-muted-foreground">No severity metrics for this run.</p>
+          )}
         </CardContent>
       </Card>
+      )}
 
       {sections.length > 0 && (
         <Card>
@@ -258,7 +289,7 @@ export function MetricsSidebar({
         </Card>
       )}
 
-      {coverageMetrics.length > 0 && (
+      {showCoverageCard && (
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Coverage</CardTitle>
@@ -288,7 +319,7 @@ export function MetricsSidebar({
         </Card>
       )}
 
-      {findings.length > 0 && (
+      {findings.length > 0 && !omitFindingsList && (
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">

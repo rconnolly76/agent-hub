@@ -27,6 +27,11 @@ import {
   type ContentBundleManifest,
 } from "@/lib/parsers/content-bundle";
 import { parseRunDetailContract } from "@/lib/run-detail-contract";
+import {
+  mergeSuiteFieldsIntoRawMetadata,
+  parseSuiteFieldsFromFormData,
+} from "@/lib/suite-metadata";
+import { skillFamilyForSkillType } from "@/lib/skills/catalog";
 
 /** Ingest can upload many blobs; keep below your Vercel plan’s function max. */
 export const maxDuration = 300;
@@ -122,6 +127,15 @@ export async function POST(req: NextRequest) {
       artifactTypeRaw.trim().toLowerCase() === "content-bundle";
 
     const skillParserConfig = project.skillParserConfig as SkillParserConfig | null;
+
+    let suiteFields: ReturnType<typeof parseSuiteFieldsFromFormData>;
+    try {
+      suiteFields = parseSuiteFieldsFromFormData(formData);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      return NextResponse.json({ error: message }, { status: 400 });
+    }
+
     let providedRunDetailContract: ReturnType<typeof parseOptionalRunDetailContract> =
       null;
     try {
@@ -173,6 +187,7 @@ export async function POST(req: NextRequest) {
         override,
         providedRunDetailContract,
         providedTopRecommendations,
+        suiteFields,
       });
     }
 
@@ -184,6 +199,7 @@ export async function POST(req: NextRequest) {
       override,
       providedRunDetailContract,
       providedTopRecommendations,
+      suiteFields,
     });
   } catch (e) {
     console.error("[POST /api/runs]", e);
@@ -200,6 +216,7 @@ async function ingestReportArtifact(opts: {
   override: ReturnType<typeof parseSkillParserOverride> | undefined;
   providedRunDetailContract: ReturnType<typeof parseOptionalRunDetailContract>;
   providedTopRecommendations: ReturnType<typeof parseOptionalTopRecommendations>;
+  suiteFields: ReturnType<typeof parseSuiteFieldsFromFormData>;
 }) {
   const {
     formData,
@@ -209,7 +226,10 @@ async function ingestReportArtifact(opts: {
     override,
     providedRunDetailContract,
     providedTopRecommendations,
+    suiteFields,
   } = opts;
+
+  const catalogFamily = skillFamilyForSkillType(skillType);
 
   const reportFile = formData.get("report");
   if (!reportFile || !isBlobLike(reportFile)) {
@@ -244,6 +264,11 @@ async function ingestReportArtifact(opts: {
     { access: "public", contentType: "text/markdown", addRandomSuffix: true }
   );
 
+  const baseMeta = {
+    artifactType: "report" as const,
+    runDetailContract: providedRunDetailContract ?? parsed.runDetail ?? null,
+    topRecommendations: topRecommendations ?? null,
+  };
   const [run] = await db
     .insert(runs)
     .values({
@@ -251,11 +276,11 @@ async function ingestReportArtifact(opts: {
       skillType,
       status: "completed",
       executiveSummary,
-      rawMetadata: {
-        artifactType: "report" as const,
-        runDetailContract: providedRunDetailContract ?? parsed.runDetail ?? null,
-        topRecommendations: topRecommendations ?? null,
-      },
+      rawMetadata: mergeSuiteFieldsIntoRawMetadata(
+        baseMeta as Record<string, unknown>,
+        suiteFields,
+        catalogFamily
+      ),
     })
     .returning();
 
@@ -383,6 +408,7 @@ async function ingestContentBundle(opts: {
   override: ReturnType<typeof parseSkillParserOverride> | undefined;
   providedRunDetailContract: ReturnType<typeof parseOptionalRunDetailContract>;
   providedTopRecommendations: ReturnType<typeof parseOptionalTopRecommendations>;
+  suiteFields: ReturnType<typeof parseSuiteFieldsFromFormData>;
 }) {
   const {
     formData,
@@ -392,7 +418,10 @@ async function ingestContentBundle(opts: {
     override,
     providedRunDetailContract,
     providedTopRecommendations,
+    suiteFields,
   } = opts;
+
+  const catalogFamily = skillFamilyForSkillType(skillType);
 
   const manifestFile = formData.get("manifest");
   if (!manifestFile || !isBlobLike(manifestFile)) {
@@ -448,6 +477,13 @@ async function ingestContentBundle(opts: {
     { access: "public", contentType: "application/json", addRandomSuffix: true }
   );
 
+  const baseMetaBundle = {
+    artifactType: "content-bundle" as const,
+    manifest,
+    mode: manifest.mode ?? null,
+    runDetailContract: providedRunDetailContract ?? parsed.runDetail ?? null,
+    topRecommendations: topRecommendations ?? null,
+  };
   const [run] = await db
     .insert(runs)
     .values({
@@ -455,13 +491,11 @@ async function ingestContentBundle(opts: {
       skillType,
       status: "completed",
       executiveSummary,
-      rawMetadata: {
-        artifactType: "content-bundle" as const,
-        manifest,
-        mode: manifest.mode ?? null,
-        runDetailContract: providedRunDetailContract ?? parsed.runDetail ?? null,
-        topRecommendations: topRecommendations ?? null,
-      },
+      rawMetadata: mergeSuiteFieldsIntoRawMetadata(
+        baseMetaBundle as Record<string, unknown>,
+        suiteFields,
+        catalogFamily
+      ),
     })
     .returning();
 

@@ -8,6 +8,8 @@
     "build:vercel": "drizzle-kit push && next build",
     "start": "next start",
     "lint": "eslint",
+    "suite-validate": "node scripts/suite-validate.mjs",
+    "suite-validate:strict": "node scripts/suite-validate.mjs --strict",
     "backfill:run-detail-contract": "node backfill-run-detail-contract.mjs",
     "backfill:top-recommendations": "node backfill-top-recommendations.mjs",
     "db:generate": "drizzle-kit generate",

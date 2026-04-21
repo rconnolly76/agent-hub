@@ -7,6 +7,11 @@ import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import type { Metadata } from "next";
+import {
+  aggregateCategoryTotals,
+  listSuiteSnapshots,
+  rollupSuiteFindings,
+} from "@/lib/suites";
 
 export const dynamic = "force-dynamic";
 
@@ -83,6 +88,20 @@ export default async function ProjectDetailPage({
   });
 
   if (!project) return notFound();
+
+  const suiteSnapshots = await listSuiteSnapshots(id);
+  const suiteCards = await Promise.all(
+    suiteSnapshots.map(async (s, idx) => ({
+      snapshot: s,
+      rollup: await rollupSuiteFindings(s),
+      canCompareToPrevious: idx + 1 < suiteSnapshots.length,
+    }))
+  );
+
+  const latestSuiteCategoryMix =
+    suiteCards[0] && suiteCards[0].snapshot.runs.length > 0
+      ? await aggregateCategoryTotals(suiteCards[0].snapshot.runs.map((r) => r.id))
+      : null;
 
   const projectRuns = await db.query.runs.findMany({
     where: eq(runs.projectId, id),
@@ -202,6 +221,111 @@ export default async function ProjectDetailPage({
       </div>
 
       <Separator className="my-8" />
+
+      {suiteCards.length > 0 && (
+        <div className="mb-10 space-y-3">
+          <div>
+            <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+              Suite snapshots
+            </h2>
+            <p className="text-xs text-muted-foreground/80 mt-1">
+              Runs grouped by <code className="text-[10px]">suiteRunId</code> from
+              batch ingest.{" "}
+              {suiteCards[0] && (
+                <span className="text-muted-foreground/90">
+                  Latest: {suiteCards[0].rollup.totalFindings} findings ·{" "}
+                  {suiteCards[0].rollup.critical} critical · {suiteCards[0].rollup.warning}{" "}
+                  warnings
+                </span>
+              )}
+            </p>
+          </div>
+          <div className="grid gap-3">
+            {suiteCards.map(({ snapshot, rollup, canCompareToPrevious }) => (
+              <Card key={snapshot.suiteRunId} className="overflow-hidden border-border/80">
+                <CardHeader className="pb-2">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <p className="text-xs font-mono text-muted-foreground break-all">
+                        {snapshot.suiteRunId}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {formatRunDate(snapshot.suiteCompletedAt)}
+                        {snapshot.commitSha && (
+                          <span className="ml-2">
+                            · commit{" "}
+                            <span className="font-mono">{snapshot.commitSha.slice(0, 7)}</span>
+                          </span>
+                        )}
+                        {snapshot.version && (
+                          <span className="ml-2">· v{snapshot.version}</span>
+                        )}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Badge variant="outline" className="text-[10px]">
+                        {rollup.totalFindings} findings
+                      </Badge>
+                      {rollup.critical > 0 ? (
+                        <Badge className="bg-red-500/15 text-red-400 border-red-500/25 text-[10px]">
+                          {rollup.critical} critical
+                        </Badge>
+                      ) : null}
+                      {rollup.warning > 0 ? (
+                        <Badge className="bg-amber-500/15 text-amber-400 border-amber-500/25 text-[10px]">
+                          {rollup.warning} warnings
+                        </Badge>
+                      ) : null}
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-0 pb-4">
+                  <div className="flex flex-wrap gap-1.5 mb-3">
+                    {snapshot.runs.map((r) => (
+                      <Link key={r.id} href={`/runs/${r.id}`}>
+                        <Badge
+                          variant="secondary"
+                          className="font-mono text-[10px] hover:bg-secondary/80"
+                        >
+                          {formatSkillType(r.skillType)}
+                        </Badge>
+                      </Link>
+                    ))}
+                  </div>
+                  {canCompareToPrevious && (
+                    <Link
+                      href={`/projects/${id}/suites/${snapshot.suiteRunId}/compare`}
+                      className="text-xs text-muted-foreground hover:text-foreground underline-offset-2 hover:underline"
+                    >
+                      Compare to previous suite →
+                    </Link>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {latestSuiteCategoryMix && Object.keys(latestSuiteCategoryMix).length > 0 && (
+        <div className="mb-10">
+          <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-2">
+            Findings by category (latest suite)
+          </h2>
+          <div className="flex flex-wrap gap-2">
+            {Object.entries(latestSuiteCategoryMix)
+              .sort((a, b) => b[1] - a[1])
+              .map(([cat, n]) => (
+                <span
+                  key={cat}
+                  className="text-xs rounded-md border border-border bg-muted/30 px-2 py-1 text-muted-foreground"
+                >
+                  <span className="text-foreground font-medium">{cat}</span> · {n}
+                </span>
+              ))}
+          </div>
+        </div>
+      )}
 
       {runsWithStats.length === 0 ? (
         <Card>

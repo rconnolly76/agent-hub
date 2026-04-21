@@ -16,6 +16,8 @@ import {
   parseRunDetailContract,
 } from "@/lib/run-detail-contract";
 import { parseTopRecommendationsPayload } from "@/lib/top-recommendations";
+import { getSkillFamilyForRun } from "@/lib/run-skill-family";
+import { FindingsTriage } from "@/components/FindingsTriage";
 
 export const dynamic = "force-dynamic";
 
@@ -132,6 +134,9 @@ export default async function RunDetailPage({
     manifest?: ContentBundleManifest;
     runDetailContract?: unknown;
     topRecommendations?: unknown;
+    suiteRunId?: string;
+    suitePhase?: number;
+    skillFamily?: string;
   } | null;
   const isContentBundle =
     rawMeta?.artifactType === "content-bundle" && rawMeta.manifest;
@@ -199,6 +204,13 @@ export default async function RunDetailPage({
         ? "bg-red-500/10 text-red-600 border-red-500/20"
         : "bg-amber-500/10 text-amber-600 border-amber-500/20";
 
+  const skillFamily = getSkillFamilyForRun(run.skillType, run.rawMetadata);
+  const showFindingsTriage =
+    runFindings.length > 0 &&
+    (skillFamily === "audit" ||
+      skillFamily === "browser" ||
+      skillFamily === "discovery");
+
   return (
     <div className="space-y-6">
       <div className="rounded-xl border border-border bg-card/40 px-5 py-5 md:px-6">
@@ -239,7 +251,7 @@ export default async function RunDetailPage({
           </span>
         </div>
 
-        <div className="mt-4 grid grid-cols-2 md:grid-cols-5 gap-2 text-xs">
+        <div className="mt-4 grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-2 text-xs">
           <div className="rounded-md border border-border bg-background/60 px-3 py-2">
             <p className="text-muted-foreground">Artifact Type</p>
             <p className="font-medium text-foreground mt-0.5">{artifactTypeLabel}</p>
@@ -253,12 +265,12 @@ export default async function RunDetailPage({
             <p className="font-medium text-foreground mt-0.5">{runFindings.length}</p>
           </div>
           <div className="rounded-md border border-border bg-background/60 px-3 py-2">
-            <p className="text-muted-foreground">Metrics</p>
-            <p className="font-medium text-foreground mt-0.5">{runMetrics.length}</p>
-          </div>
-          <div className="rounded-md border border-border bg-background/60 px-3 py-2">
-            <p className="text-muted-foreground">Artifacts</p>
-            <p className="font-medium text-foreground mt-0.5">{runArtifacts.length}</p>
+            <p className="text-muted-foreground">Suite</p>
+            <p className="font-medium text-foreground mt-0.5 font-mono text-[11px] break-all">
+              {rawMeta?.suiteRunId
+                ? `${rawMeta.suiteRunId.slice(0, 8)}…`
+                : "—"}
+            </p>
           </div>
         </div>
       </div>
@@ -278,6 +290,14 @@ export default async function RunDetailPage({
               {topRecommendations.length > 0 && (
                 <a href="#top-recommendations" className="block text-muted-foreground hover:text-foreground transition-colors">
                   Top Recommendations
+                </a>
+              )}
+              {showFindingsTriage && (
+                <a
+                  href="#findings-triage"
+                  className="block text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Findings
                 </a>
               )}
               {isContentBundle && contentFileData.length > 0 && (
@@ -362,6 +382,17 @@ export default async function RunDetailPage({
             </section>
           )}
 
+          {showFindingsTriage && (
+            <FindingsTriage
+              findings={runFindings.map((f) => ({
+                id: f.id,
+                severity: f.severity,
+                title: f.title,
+                category: f.category,
+              }))}
+            />
+          )}
+
           {isContentBundle &&
             rawMeta.manifest &&
             contentFileData.length > 0 && (
@@ -402,6 +433,8 @@ export default async function RunDetailPage({
               skillType={run.skillType}
               runDetailContract={effectiveRunDetailContract}
               linkSections={Boolean(reportContent)}
+              skillFamily={skillFamily}
+              omitFindingsList={showFindingsTriage}
             />
           </div>
         </aside>

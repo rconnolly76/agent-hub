@@ -9,7 +9,7 @@
       "skill": "ux-journey-discovery",
       "model": null,
       "enabled": true,
-      "outputs": ["ux-journeys.md", "ux-journey-configs/", "_run-detail-contract.json", "_top-5-recommendations.json"],
+      "outputs": ["ux-journeys.md", "ux-journey-configs/", ".agent-hub-sidecars/ux-journey-discovery/"],
       "dependsOn": []
     },
     "ux-design-system-audit": {
@@ -18,7 +18,7 @@
       "skill": "ux-design-system-audit",
       "model": null,
       "enabled": true,
-      "outputs": ["design-system-audit.md", "_run-detail-contract.json", "_top-5-recommendations.json"],
+      "outputs": ["design-system-audit.md", ".agent-hub-sidecars/ux-design-system-audit/"],
       "dependsOn": []
     },
     "code-quality-audit": {
@@ -27,7 +27,7 @@
       "skill": "code-quality-audit",
       "model": null,
       "enabled": true,
-      "outputs": ["code-quality-audit.md", "_run-detail-contract.json", "_top-5-recommendations.json"],
+      "outputs": ["code-quality-audit.md", ".agent-hub-sidecars/code-quality-audit/"],
       "dependsOn": []
     },
     "web-security-audit": {
@@ -36,7 +36,7 @@
       "skill": "web-security-audit",
       "model": null,
       "enabled": true,
-      "outputs": ["web-security-audit.md", "_run-detail-contract.json", "_top-5-recommendations.json"],
+      "outputs": ["web-security-audit.md", ".agent-hub-sidecars/web-security-audit/"],
       "dependsOn": []
     },
     "ux-journey-reviewer": {
@@ -45,7 +45,7 @@
       "skill": "ux-journey-reviewer",
       "model": null,
       "enabled": true,
-      "outputs": ["ux-journey-report.md", "ux-journey-screenshots/", "_run-detail-contract.json", "_top-5-recommendations.json"],
+      "outputs": ["ux-journey-report.md", "ux-journey-screenshots/", ".agent-hub-sidecars/ux-journey-reviewer/"],
       "dependsOn": ["ux-journey-discovery"]
     },
     "ux-visual-design-review": {
@@ -54,7 +54,7 @@
       "skill": "ux-visual-design-review",
       "model": null,
       "enabled": true,
-      "outputs": ["visual-design-review.md", "visual-review-screenshots/", "_run-detail-contract.json", "_top-5-recommendations.json"],
+      "outputs": ["visual-design-review.md", "visual-review-screenshots/", ".agent-hub-sidecars/ux-visual-design-review/"],
       "dependsOn": []
     },
     "web-performance-audit": {
@@ -63,7 +63,7 @@
       "skill": "web-performance-audit",
       "model": null,
       "enabled": true,
-      "outputs": ["web-performance-audit.md", "_run-detail-contract.json", "_top-5-recommendations.json"],
+      "outputs": ["web-performance-audit.md", ".agent-hub-sidecars/web-performance-audit/"],
       "dependsOn": []
     },
     "product-marketer": {
@@ -72,7 +72,7 @@
       "skill": "product-marketer",
       "model": null,
       "enabled": true,
-      "outputs": ["product-marketing/", "product-marketing/_run-detail-contract.json", "product-marketing/_top-5-recommendations.json"],
+      "outputs": ["product-marketing/"],
       "dependsOn": []
     },
     "product-docs-author": {
@@ -81,7 +81,7 @@
       "skill": "product-docs-author",
       "model": null,
       "enabled": true,
-      "outputs": ["docs/", "docs/_run-detail-contract.json", "docs/_top-5-recommendations.json"],
+      "outputs": ["docs/"],
       "dependsOn": []
     },
     "agent-hub-push": {
