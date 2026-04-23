@@ -24,10 +24,10 @@ export function RunDetailCommandShell({
             : "grid-cols-1 lg:grid-cols-[220px_minmax(0,1fr)]",
         )}
       >
-        <aside className="hidden lg:flex flex-col border-b border-white/[0.06] lg:border-b-0 lg:border-r bg-[#0a0a0a] min-h-0 overflow-y-auto">
+        <aside className="hidden lg:flex min-h-0 flex-col overflow-y-auto border-b border-white/[0.08] bg-black lg:border-b-0 lg:border-r">
           {nav}
         </aside>
-        <div className="lg:hidden border-b border-white/[0.06] bg-[#0a0a0a] p-3">
+        <div className="border-b border-white/[0.08] bg-black p-3 lg:hidden">
           {nav}
         </div>
         <main className="min-w-0 min-h-0 overflow-y-auto border-b border-white/[0.06] lg:border-b-0 bg-[#0a0a0a]">

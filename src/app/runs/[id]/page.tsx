@@ -13,6 +13,8 @@ import {
   buildRunDetailContractFromBundleManifest,
   buildRunDetailContractFromReport,
   parseRunDetailContract,
+  type RunDetailContractV1,
+  type RunSectionHealthLevel,
 } from "@/lib/run-detail-contract";
 import { parseTopRecommendationsPayload } from "@/lib/top-recommendations";
 import { getSkillFamilyForRun } from "@/lib/run-skill-family";
@@ -108,16 +110,30 @@ function firstSentence(text: string): string {
 function countSeverities(rows: { severity: string }[]) {
   let critical = 0;
   let warning = 0;
-  let mixed = 0;
+  let investigate = 0;
+  let info = 0;
   let low = 0;
   for (const f of rows) {
     const s = f.severity.toLowerCase();
     if (s === "critical") critical++;
     else if (s === "warning") warning++;
-    else if (s === "investigate" || s === "info") mixed++;
+    else if (s === "investigate") investigate++;
+    else if (s === "info") info++;
     else low++;
   }
-  return { critical, warning, mixed, low };
+  return { critical, warning, investigate, info, low };
+}
+
+function sectionLevelForReportSlug(
+  contract: RunDetailContractV1 | null,
+  slug: string,
+): RunSectionHealthLevel | undefined {
+  if (!contract?.sections) return undefined;
+  for (const s of contract.sections) {
+    if (s.id === slug) return s.level;
+    if (slugify(s.title) === slug) return s.level;
+  }
+  return undefined;
 }
 
 function hasCoverageMetrics(
@@ -258,10 +274,15 @@ export default async function RunDetailPage({
 
   const overview: NavSectionDef["items"] = [];
   if (run.executiveSummary) {
-    overview.push({ href: "#summary", label: "Executive summary" });
+    overview.push({
+      key: "ov-summary",
+      href: "#summary",
+      label: "Executive summary",
+    });
   }
   if (topRecommendations.length > 0) {
     overview.push({
+      key: "ov-recs",
       href: "#top-recommendations",
       label: "Top recommendations",
     });
@@ -273,28 +294,63 @@ export default async function RunDetailPage({
   if (showFindingsTriage) {
     const triageItems: NavSectionDef["items"] = [
       {
+        key: "filter-all",
         href: "#findings-triage",
         label: "All findings",
         count: runFindings.length,
+        triageAll: true,
       },
       ...(sevCounts.critical > 0
-        ? [{ href: "#findings-triage", label: "Critical", count: sevCounts.critical }]
-        : []),
-      ...(sevCounts.warning > 0
-        ? [{ href: "#findings-triage", label: "Warning", count: sevCounts.warning }]
-        : []),
-      ...(sevCounts.mixed > 0
         ? [
             {
+              key: "filter-critical",
+              href: "#findings-triage",
+              label: "Critical",
+              count: sevCounts.critical,
+              triageFilter: true,
+              severityDot: "critical" as const,
+            },
+          ]
+        : []),
+      ...(sevCounts.warning > 0
+        ? [
+            {
+              key: "filter-warning",
+              href: "#findings-triage",
+              label: "Warning",
+              count: sevCounts.warning,
+              triageFilter: true,
+              severityDot: "warning" as const,
+            },
+          ]
+        : []),
+      ...(sevCounts.investigate > 0
+        ? [
+            {
+              key: "filter-investigate",
               href: "#findings-triage",
               label: "Investigate",
-              count: sevCounts.mixed,
+              count: sevCounts.investigate,
+              triageFilter: true,
+              severityDot: "investigate" as const,
+            },
+          ]
+        : []),
+      ...(sevCounts.info + sevCounts.low > 0
+        ? [
+            {
+              key: "filter-info-low",
+              href: "#findings-triage",
+              label: "Info & low",
+              count: sevCounts.info + sevCounts.low,
+              triageFilter: true,
+              severityDot: "info" as const,
             },
           ]
         : []),
     ];
     if (triageItems.length > 0) {
-      navSections.push({ title: "Triage", items: triageItems });
+      navSections.push({ title: "Filter", items: triageItems });
     }
   }
 
@@ -303,32 +359,57 @@ export default async function RunDetailPage({
     reportContent &&
     !(isContentBundle && reportArtifact?.filename === "bundle-overview.md")
   ) {
-    reportItems.push({ href: "#report", label: "Full report" });
+    reportItems.push({ key: "r-full", href: "#report", label: "Full report" });
     for (const s of reportSections) {
-      reportItems.push({ href: `#${s.slug}`, label: s.title });
+      const level = sectionLevelForReportSlug(effectiveRunDetailContract, s.slug);
+      reportItems.push({
+        key: `r-sec-${s.slug}`,
+        href: `#${s.slug}`,
+        label: s.title,
+        ...(level != null ? { sectionLevel: level } : {}),
+      });
     }
   }
   if (showCoverage) {
-    reportItems.push({ href: "#coverage-steps", label: "Coverage" });
+    reportItems.push({ key: "r-cov", href: "#coverage-steps", label: "Coverage" });
   }
   if (reportItems.length > 0) {
     navSections.push({ title: "Report", items: reportItems });
   }
 
-  const evidence: NavSectionDef["items"] = [];
+  const runSection: NavSectionDef["items"] = [];
   if (isContentBundle && contentFileData.length > 0) {
-    evidence.push({ href: "#content-bundle", label: "Content bundle" });
+    runSection.push({
+      key: "run-bundle",
+      href: "#content-bundle",
+      label: "Content bundle",
+      rowIcon: "file" as const,
+    });
   }
   if (screenshots.length > 0) {
-    evidence.push({
+    runSection.push({
+      key: "run-shots",
       href: "#screenshots",
       label: "Screenshots",
       count: screenshots.length,
+      rowIcon: "camera" as const,
     });
   }
-  evidence.push({ href: "#metrics", label: "Metrics & signals" });
-  if (evidence.length > 0) {
-    navSections.push({ title: "Evidence", items: evidence });
+  runSection.push({
+    key: "run-metrics",
+    href: "#metrics",
+    label: "Metrics & signals",
+    rowIcon: "activity" as const,
+  });
+  runSection.push({
+    key: "run-rerun",
+    href: "#",
+    label: "Re-run",
+    rowIcon: "play" as const,
+    interactive: false,
+  });
+  if (runSection.length > 0) {
+    navSections.push({ title: "Run", items: runSection });
   }
 
   const findingInspectorData = runFindings.map((f) => ({
