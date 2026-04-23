@@ -15,6 +15,9 @@ export type StrategyRoadmapRow = {
   priorityLabel: string;
   /** Lower sorts first within the same source (Now before Next). */
   prioritySort: number;
+  score: number | null;
+  effort: string | null;
+  linked: string[];
 };
 
 type Rec = {
@@ -25,6 +28,13 @@ type Rec = {
   theme?: string;
   epic?: string;
   owner?: string;
+  score?: number | string;
+  riceScore?: number | string;
+  demandScore?: number | string;
+  effort?: string;
+  effortT?: string;
+  linked?: string[];
+  linkedBacklog?: string[];
 };
 
 function parseTitleParts(title: string): { code: string; headline: string } {
@@ -103,6 +113,22 @@ function buildRow(
       return themeLine || "—";
     })();
 
+  const rawScore = rec.score ?? rec.riceScore ?? rec.demandScore ?? null;
+  const score =
+    rawScore == null || rawScore === ""
+      ? null
+      : typeof rawScore === "number"
+        ? rawScore
+        : Number.isFinite(Number(rawScore))
+          ? Number(rawScore)
+          : null;
+  const effort = rec.effort ?? rec.effortT ?? null;
+  const linked = Array.isArray(rec.linked)
+    ? rec.linked
+    : Array.isArray(rec.linkedBacklog)
+      ? rec.linkedBacklog
+      : [];
+
   return {
     findingId: f.id,
     runId: f.runId,
@@ -116,6 +142,9 @@ function buildRow(
     who,
     priorityLabel,
     prioritySort,
+    score,
+    effort,
+    linked,
   };
 }
 
