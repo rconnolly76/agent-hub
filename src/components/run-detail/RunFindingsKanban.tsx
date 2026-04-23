@@ -9,17 +9,11 @@ import {
   severityDot,
   severityMonoClass,
 } from "./run-detail-tokens";
-import { useFindingHash } from "./use-finding-hash";
-
-export interface KanbanFindingRow {
-  id: string;
-  severity: string;
-  title: string;
-  category: string | null;
-}
+import { useCommandCenter, type CCFindingRow } from "./command-center-context";
+import { LinearGlyph } from "./LinearGlyph";
 
 interface RunFindingsKanbanProps {
-  findings: KanbanFindingRow[];
+  findings: CCFindingRow[];
   /** Verdict strip; reference order: title row → verdict → board */
   verdict?: ReactNode;
 }
@@ -35,8 +29,14 @@ export function RunFindingsKanban({
   findings: rows,
   verdict,
 }: RunFindingsKanbanProps) {
-  const ids = useMemo(() => rows.map((r) => r.id), [rows]);
-  const { selectedId, select } = useFindingHash(ids);
+  const {
+    selectedId,
+    setSelectedId,
+    multiSelect,
+    toggleMulti,
+    linearState,
+    openLinearModal,
+  } = useCommandCenter();
 
   const categories = useMemo(() => {
     const set = new Set<string>();
@@ -56,7 +56,7 @@ export function RunFindingsKanban({
   }, [rows, cat]);
 
   const columns = useMemo(() => {
-    const map: Record<string, KanbanFindingRow[]> = {
+    const map: Record<string, CCFindingRow[]> = {
       critical: [],
       warning: [],
       mixed: [],
@@ -78,7 +78,15 @@ export function RunFindingsKanban({
           </h1>
           <p className="text-xs text-zinc-500/90 mt-0.5">
             {filtered.length} findings
-            {cat !== "all" ? ` · ${cat}` : ""} · select to inspect
+            {cat !== "all" ? ` · ${cat}` : ""} · press{" "}
+            <kbd className="rounded border border-white/10 bg-white/[0.06] px-1 py-px font-mono text-[10px] text-zinc-200/80">
+              X
+            </kbd>{" "}
+            to multi-select,{" "}
+            <kbd className="rounded border border-white/10 bg-white/[0.06] px-1 py-px font-mono text-[10px] text-zinc-200/80">
+              L
+            </kbd>{" "}
+            to push
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
@@ -152,21 +160,49 @@ export function RunFindingsKanban({
               <div className="flex flex-col gap-2 flex-1">
                 {items.map((f) => {
                   const active = f.id === selectedId;
+                  const isMulti = multiSelect.has(f.id);
+                  const ls = linearState[f.id];
+                  const synced = ls?.status === "synced";
+                  const pushing = ls?.status === "pushing";
                   return (
-                    <button
+                    <div
                       key={f.id}
-                      type="button"
-                      onClick={() => select(f.id)}
+                      onClick={(e) => {
+                        if (e.shiftKey || e.metaKey || e.ctrlKey) {
+                          toggleMulti(f.id);
+                        } else {
+                          setSelectedId(f.id);
+                        }
+                      }}
                       className={cn(
-                        "text-left rounded-[7px] border p-2.5 text-sm transition-colors",
+                        "relative cursor-pointer text-left rounded-[7px] border p-2.5 text-sm transition-colors",
                         active
                           ? cn(
-                              "bg-white/[0.06] border-violet-500/90",
+                              "bg-white/[0.055] border-violet-500",
                               CC_ACCENT.ring,
                             )
-                          : "border-white/[0.06] bg-white/[0.025] hover:border-white/10 hover:bg-white/[0.04]",
+                          : isMulti
+                            ? "border-violet-500/40 bg-violet-500/[0.08]"
+                            : "border-white/[0.06] bg-white/[0.025] hover:border-white/10 hover:bg-white/[0.04]",
                       )}
                     >
+                      {isMulti && (
+                        <div className="absolute top-1.5 right-1.5 flex h-3.5 w-3.5 items-center justify-center rounded-[3px] bg-violet-500 text-white">
+                          <svg
+                            width="9"
+                            height="9"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="3.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden
+                          >
+                            <path d="M20 6 9 17l-5-5" />
+                          </svg>
+                        </div>
+                      )}
                       <div className="flex items-center gap-2 mb-1.5">
                         <span
                           className={cn(
@@ -185,7 +221,32 @@ export function RunFindingsKanban({
                       <div className="text-xs font-medium leading-[1.4] text-zinc-100/90">
                         {f.title}
                       </div>
-                    </button>
+                      <div className="flex items-center gap-1.5 mt-2">
+                        <span className="flex-1" />
+                        {synced ? (
+                          <span className="inline-flex items-center gap-1 rounded border border-[rgba(94,106,210,0.35)] bg-[rgba(94,106,210,0.18)] px-1.5 py-0.5 font-mono text-[10px] font-semibold text-[#a5afff]">
+                            <LinearGlyph size={9} />
+                            {ls?.issueId}
+                          </span>
+                        ) : pushing ? (
+                          <span className="animate-pulse text-[10px] text-zinc-300/70">
+                            syncing…
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openLinearModal([f.id]);
+                            }}
+                            className="inline-flex items-center gap-1 rounded border border-white/10 px-1.5 py-0.5 text-[10px] font-medium text-zinc-300/80 hover:border-white/20 hover:text-zinc-50"
+                          >
+                            <LinearGlyph size={9} />
+                            Push
+                          </button>
+                        )}
+                      </div>
+                    </div>
                   );
                 })}
                 {items.length === 0 && (

@@ -26,6 +26,11 @@ import { RunFindingsKanban } from "@/components/run-detail/RunFindingsKanban";
 import { FindingInspector } from "@/components/run-detail/FindingInspector";
 import { RunCoverageSummary } from "@/components/run-detail/RunCoverageSummary";
 import { worstSeverity } from "@/components/run-detail/run-detail-tokens";
+import { CommandCenterProvider } from "@/components/run-detail/command-center-context";
+import { LinearPushModal } from "@/components/run-detail/LinearPushModal";
+import { CommandPalette } from "@/components/run-detail/CommandPalette";
+import { LinearToast } from "@/components/run-detail/LinearToast";
+import { LinearSyncBlock } from "@/components/run-detail/LinearSyncBlock";
 
 export const dynamic = "force-dynamic";
 
@@ -431,6 +436,27 @@ export default async function RunDetailPage({
 
   const showVerdictStrip =
     Boolean(run.executiveSummary) || runFindings.length > 0;
+
+  const metricNum = (k: string): number | null => {
+    const m = runMetrics.find((x) => x.key === k);
+    return m ? m.value : null;
+  };
+  const stepsPassed = metricNum("steps_passed");
+  const stepsWarning = metricNum("steps_warning");
+  const stepsFailed = metricNum("steps_failed");
+  const heuristicPctRaw =
+    metricNum("heuristic_coverage_pct") ?? metricNum("heuristic_coverage");
+  const heuristicPct =
+    heuristicPctRaw != null
+      ? Math.round(heuristicPctRaw > 1 ? heuristicPctRaw : heuristicPctRaw * 100)
+      : null;
+  const verdictStats = {
+    passed: stepsPassed ?? undefined,
+    warnings: stepsWarning ?? undefined,
+    failed: stepsFailed ?? undefined,
+    heuristicPct,
+  };
+
   const verdictElement = showVerdictStrip && (
     <VerdictStrip
       headline={verdictHeadline}
@@ -439,6 +465,7 @@ export default async function RunDetailPage({
       readMoreText={
         showFindingsTriage ? "Read full verdict" : "Read full summary"
       }
+      stats={verdictStats}
     />
   );
 
@@ -556,23 +583,47 @@ export default async function RunDetailPage({
     </div>
   );
 
-  return (
-    <div className="space-y-6 pb-8">
-      <div className="rd-cc-surface rounded-lg border border-white/[0.08] overflow-hidden shadow-2xl shadow-black/30">
-        <RunDetailSlimHeader
-          projectId={run.project.id}
-          projectName={run.project.name}
-          runId={run.id}
-          status={run.status}
-          skillLabel={skillLabel}
-          dateLabel={dateLabel}
-        />
-        <RunDetailCommandShell
-          nav={<RunSectionNav sections={navSections} />}
-          main={mainColumn}
-          aside={metricsAside}
-        />
+  const navElement = (
+    <div className="flex h-full min-h-0 flex-col bg-black">
+      {showFindingsTriage && (
+        <div className="pt-3">
+          <LinearSyncBlock />
+        </div>
+      )}
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <RunSectionNav sections={navSections} />
       </div>
     </div>
+  );
+
+  const shell = (
+    <div className="rd-cc-surface rounded-lg border border-white/[0.08] overflow-hidden shadow-2xl shadow-black/30">
+      <RunDetailSlimHeader
+        projectId={run.project.id}
+        projectName={run.project.name}
+        runId={run.id}
+        status={run.status}
+        skillLabel={skillLabel}
+        dateLabel={dateLabel}
+      />
+      <RunDetailCommandShell
+        nav={navElement}
+        main={mainColumn}
+        aside={metricsAside}
+      />
+    </div>
+  );
+
+  if (!showFindingsTriage) {
+    return <div className="space-y-6 pb-8">{shell}</div>;
+  }
+
+  return (
+    <CommandCenterProvider findings={kanbanFindings}>
+      <div className="space-y-6 pb-8">{shell}</div>
+      <LinearPushModal />
+      <CommandPalette />
+      <LinearToast />
+    </CommandCenterProvider>
   );
 }
