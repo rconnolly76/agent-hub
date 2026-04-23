@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { SeverityPill } from "./SeverityPill";
 import { severityMonoClass } from "./run-detail-tokens";
 import { useFindingHash } from "./use-finding-hash";
+import { FindingRecommendationView } from "./finding-recommendation-view";
 
 export interface FindingInspectorData {
   id: string;
@@ -73,12 +74,6 @@ export function FindingInspector({ findings }: FindingInspectorProps) {
     );
   }
 
-  const rec = f.recommendation as Record<string, unknown> | null;
-  const recStr =
-    rec && typeof rec === "object" && Object.keys(rec).length > 0
-      ? JSON.stringify(rec, null, 2)
-      : null;
-
   return (
     <div className="flex flex-col gap-4 text-zinc-100" id="finding-inspector">
       <div className="flex items-center flex-wrap gap-2">
@@ -115,13 +110,7 @@ export function FindingInspector({ findings }: FindingInspectorProps) {
         </Block>
       )}
 
-      {recStr && (
-        <Block title="Recommendation">
-          <pre className="m-0 text-xs text-zinc-400/90 bg-black/30 rounded-md border border-white/[0.06] p-3 overflow-x-auto whitespace-pre-wrap font-mono leading-relaxed max-h-48">
-            {recStr}
-          </pre>
-        </Block>
-      )}
+      <FindingRecommendationView recommendation={f.recommendation} />
     </div>
   );
 }
