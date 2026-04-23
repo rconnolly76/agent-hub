@@ -2,7 +2,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export default function Loading() {
   return (
-    <div>
+    <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-10 animate-fade-in">
       <div className="flex items-center justify-between mb-8">
         <div>
           <Skeleton className="h-7 w-32 mb-2" />

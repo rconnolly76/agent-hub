@@ -3,9 +3,5 @@ export default function RunDetailLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return (
-    <div className="mx-auto w-full max-w-[min(100%,1600px)]">
-      {children}
-    </div>
-  );
+  return <div className="w-full max-w-none min-w-0 px-0">{children}</div>;
 }

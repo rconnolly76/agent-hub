@@ -185,7 +185,7 @@ export default async function ProjectDetailPage({
   }
 
   return (
-    <div>
+    <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-10 animate-fade-in">
       <div className="mb-8">
         <Link
           href="/"

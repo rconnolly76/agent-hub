@@ -44,7 +44,8 @@ export default async function SuiteComparePage({
   ]);
 
   return (
-    <div className="space-y-8 max-w-4xl">
+    <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-10">
+      <div className="space-y-8 max-w-4xl">
       <div>
         <Link
           href={`/projects/${projectId}`}
@@ -159,6 +160,7 @@ export default async function SuiteComparePage({
           )}
         </>
       )}
+    </div>
     </div>
   );
 }
