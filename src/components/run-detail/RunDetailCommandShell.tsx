@@ -18,21 +18,23 @@ export function RunDetailCommandShell({
     <div className={cn("space-y-0", className)}>
       <div
         className={cn(
-          "grid min-h-[min(80vh,calc(100vh-8rem))] gap-0 overflow-hidden bg-card/20",
+          "grid min-h-[min(100vh,920px)] lg:min-h-[calc(100vh-8.25rem)] gap-0 overflow-hidden bg-[#0a0a0a]",
           aside
             ? "grid-cols-1 lg:grid-cols-[220px_minmax(0,1fr)_min(100%,400px)]"
             : "grid-cols-1 lg:grid-cols-[220px_minmax(0,1fr)]",
         )}
       >
-        <aside className="hidden lg:flex flex-col border-b lg:border-b-0 lg:border-r border-border bg-background/40 min-h-0 overflow-y-auto">
+        <aside className="hidden lg:flex flex-col border-b border-white/[0.06] lg:border-b-0 lg:border-r bg-[#0a0a0a] min-h-0 overflow-y-auto">
           {nav}
         </aside>
-        <div className="lg:hidden border-b border-border p-3">{nav}</div>
-        <main className="min-w-0 min-h-0 overflow-y-auto border-b lg:border-b-0 border-border">
+        <div className="lg:hidden border-b border-white/[0.06] bg-[#0a0a0a] p-3">
+          {nav}
+        </div>
+        <main className="min-w-0 min-h-0 overflow-y-auto border-b border-white/[0.06] lg:border-b-0 bg-[#0a0a0a]">
           {main}
         </main>
         {aside ? (
-          <aside className="min-h-0 overflow-y-auto border-t lg:border-t-0 lg:border-l border-border bg-background/30 p-4 xl:p-5">
+          <aside className="min-h-0 overflow-y-auto border-t border-white/[0.06] lg:border-t-0 lg:border-l border-white/[0.06] bg-[#0a0a0a] px-4 py-4 xl:px-[18px]">
             {aside}
           </aside>
         ) : null}

@@ -121,6 +121,34 @@
   * {
     @apply border-border outline-ring/50;
   }
+  /* Run detail command center: near-black surface + shadcn cards in right rail */
+  .rd-cc-surface {
+    @apply bg-[#0a0a0a] text-zinc-100;
+  }
+  .rd-cc-surface [data-slot="card"] {
+    @apply border-0 ring-1 ring-inset;
+    @apply bg-white/[0.02] text-zinc-200 ring-white/10;
+  }
+  .rd-cc-surface [data-slot="card-header"] [data-slot="card-title"] {
+    @apply text-zinc-500;
+  }
+  .rd-cc-surface .report-prose p,
+  .rd-cc-surface .report-prose li {
+    color: rgb(212 212 216 / 0.92);
+  }
+  .rd-cc-surface .report-prose h3,
+  .rd-cc-surface .report-prose h4 {
+    color: rgb(250 250 250 / 0.95);
+  }
+  .rd-cc-surface .report-prose a {
+    @apply text-violet-400 hover:text-violet-300;
+  }
+  .rd-cc-surface .report-prose code {
+    @apply bg-zinc-900/80 text-zinc-200 border border-white/10;
+  }
+  .rd-cc-surface .report-prose pre {
+    @apply border border-white/10;
+  }
   body {
     @apply bg-background text-foreground text-sm leading-relaxed;
   }

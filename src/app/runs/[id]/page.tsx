@@ -348,33 +348,45 @@ export default async function RunDetailPage({
     category: f.category,
   }));
 
-  const mainColumn = (
-    <div className="p-5 md:p-6 space-y-8">
-      {(run.executiveSummary || runFindings.length > 0) && (
-        <VerdictStrip
-          headline={verdictHeadline}
-          worstSeverity={worst}
-          linkToSummary={Boolean(run.executiveSummary)}
-        />
-      )}
+  const showVerdictStrip =
+    Boolean(run.executiveSummary) || runFindings.length > 0;
+  const verdictElement = showVerdictStrip && (
+    <VerdictStrip
+      headline={verdictHeadline}
+      worstSeverity={worst}
+      linkToSummary={Boolean(run.executiveSummary)}
+      readMoreText={
+        showFindingsTriage ? "Read full verdict" : "Read full summary"
+      }
+    />
+  );
 
-      {showFindingsTriage && <RunFindingsKanban findings={kanbanFindings} />}
+  const mainColumn = (
+    <div className="px-[18px] sm:px-[22px] py-[18px] space-y-8 text-zinc-200">
+      {showFindingsTriage ? (
+        <RunFindingsKanban findings={kanbanFindings} verdict={verdictElement} />
+      ) : (
+        verdictElement
+      )}
 
       <RunCoverageSummary metrics={runMetrics} />
 
       {run.executiveSummary && (
-        <section id="summary" className="rounded-lg border border-border bg-card/40 px-6 py-5">
-          <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
+        <section
+          id="summary"
+          className="rounded-[9px] border border-white/[0.1] bg-white/[0.02] px-6 py-5"
+        >
+          <h2 className="text-xs font-medium text-zinc-500/90 uppercase tracking-wider mb-3">
             Executive summary
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4 text-xs">
-            <div className="rounded-md border border-border bg-background/60 px-3 py-2">
-              <p className="text-muted-foreground">Run date</p>
-              <p className="font-medium text-foreground mt-0.5">{dateLabel}</p>
+            <div className="rounded-md border border-white/[0.08] bg-white/[0.02] px-3 py-2">
+              <p className="text-zinc-500/90">Run date</p>
+              <p className="font-medium text-zinc-200 mt-0.5">{dateLabel}</p>
             </div>
-            <div className="rounded-md border border-border bg-background/60 px-3 py-2">
-              <p className="text-muted-foreground">Artifact type</p>
-              <p className="font-medium text-foreground mt-0.5">{artifactTypeLabel}</p>
+            <div className="rounded-md border border-white/[0.08] bg-white/[0.02] px-3 py-2">
+              <p className="text-zinc-500/90">Artifact type</p>
+              <p className="font-medium text-zinc-200 mt-0.5">{artifactTypeLabel}</p>
             </div>
           </div>
           <MarkdownSummary content={run.executiveSummary} />
@@ -382,25 +394,28 @@ export default async function RunDetailPage({
       )}
 
       {topRecommendations.length > 0 && (
-        <section id="top-recommendations" className="rounded-lg border border-border bg-card/40 px-6 py-5">
-          <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
+        <section
+          id="top-recommendations"
+          className="rounded-[9px] border border-white/[0.1] bg-white/[0.02] px-6 py-5"
+        >
+          <h2 className="text-xs font-medium text-zinc-500/90 uppercase tracking-wider mb-3">
             Top recommendations
           </h2>
           <div className="space-y-2">
             {topRecommendations.map((item) => (
               <div
                 key={item.priority}
-                className="rounded-md border border-border bg-background/60 p-3"
+                className="rounded-md border border-white/[0.08] bg-white/[0.02] p-3"
               >
                 <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm font-medium text-foreground">{item.title}</p>
-                  <span className="text-[10px] uppercase tracking-wider text-muted-foreground border border-border rounded px-1.5 py-0.5">
+                  <p className="text-sm font-medium text-zinc-100/90">{item.title}</p>
+                  <span className="text-[10px] uppercase tracking-wider text-zinc-500/90 border border-white/10 rounded px-1.5 py-0.5">
                     {item.priority}
                   </span>
                 </div>
-                <p className="text-sm text-muted-foreground mt-1">{item.action}</p>
+                <p className="text-sm text-zinc-400/90 mt-1">{item.action}</p>
                 {item.rationale && (
-                  <p className="text-xs text-muted-foreground/80 mt-1.5">{item.rationale}</p>
+                  <p className="text-xs text-zinc-500/80 mt-1.5">{item.rationale}</p>
                 )}
               </div>
             ))}
@@ -428,12 +443,12 @@ export default async function RunDetailPage({
           />
         </section>
       ) : !isContentBundle && !reportContent ? (
-        <p className="text-muted-foreground">No report content available.</p>
+        <p className="text-zinc-500/90">No report content available.</p>
       ) : null}
 
       {screenshots.length > 0 && (
         <section id="screenshots">
-          <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-4">
+          <h2 className="text-sm font-medium text-zinc-500/90 uppercase tracking-wider mb-4">
             Screenshots
           </h2>
           <ScreenshotGallery screenshots={screenshots} />
@@ -443,7 +458,10 @@ export default async function RunDetailPage({
   );
 
   const metricsAside = (
-    <div id="metrics" className="space-y-4 xl:sticky xl:top-[calc(4rem+1.5rem)]">
+    <div
+      id="metrics"
+      className="space-y-5 xl:sticky xl:top-[calc(4rem+1.5rem)]"
+    >
       {showFindingsTriage && <FindingInspector findings={findingInspectorData} />}
       <MetricsSidebar
         metrics={runMetrics}
@@ -459,7 +477,7 @@ export default async function RunDetailPage({
 
   return (
     <div className="space-y-6 pb-8">
-      <div className="rounded-lg border border-border overflow-hidden bg-card/30">
+      <div className="rd-cc-surface rounded-lg border border-white/[0.08] overflow-hidden shadow-2xl shadow-black/30">
         <RunDetailSlimHeader
           projectId={run.project.id}
           projectName={run.project.name}

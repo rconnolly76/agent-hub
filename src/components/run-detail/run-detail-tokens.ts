@@ -78,3 +78,20 @@ export function kanbanColumnForSeverity(sev: string): string {
   if (s === "investigate" || s === "info") return "mixed";
   return "low";
 }
+
+/** Monospace / title color for finding id in kanban (matches design reference SEV.fg) */
+export function severityMonoClass(sev: string): string {
+  const s = sev.toLowerCase();
+  if (s === "critical") return "text-red-500";
+  if (s === "warning") return "text-amber-500";
+  if (s === "investigate" || s === "info" || s === "mixed")
+    return "text-violet-300";
+  if (s === "low") return "text-zinc-500";
+  return "text-zinc-400";
+}
+
+/** Accent for selected border (violet, matches reference app shell) */
+export const CC_ACCENT = {
+  border: "border-violet-500",
+  ring: "shadow-[0_0_0_3px_rgba(139,92,246,0.13)]",
+} as const;
