@@ -13,6 +13,8 @@ export interface ParsedFinding {
   description: string;
   category: string;
   recommendation: {
+    /** Plain-language outcome for strategy roadmap / backlog (Hub Project Strategy UI). */
+    userOutcome?: string;
     what?: string;
     why?: string;
     type?: string;

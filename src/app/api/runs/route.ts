@@ -14,6 +14,7 @@ import {
   parseReportForIngest,
   parseSkillParserOverride,
   type SkillParserConfig,
+  type AuxiliaryIngestConfigs,
 } from "@/lib/parsers";
 import { ensureExecutiveSummaryWithNextSteps } from "@/lib/parsers/executive-summary";
 import {
@@ -209,6 +210,29 @@ export async function POST(req: NextRequest) {
   }
 }
 
+/** Optional `config:roadmap.json` / `config:backlog.json` for strategy report parsing. */
+async function extractAuxiliaryStrategyConfigs(
+  formData: FormData
+): Promise<AuxiliaryIngestConfigs | null> {
+  const out: AuxiliaryIngestConfigs = {};
+  for (const [key, value] of formData.entries()) {
+    if (!key.startsWith("config:") || !isBlobLike(value)) continue;
+    const name = key.slice("config:".length).trim();
+    const base =
+      name.includes("/") ? (name.split("/").pop() ?? name) : name;
+    if (base !== "roadmap.json" && base !== "backlog.json") continue;
+    try {
+      const text = await value.text();
+      const parsed = JSON.parse(text) as unknown;
+      if (base === "roadmap.json") out.roadmapJson = parsed;
+      if (base === "backlog.json") out.backlogJson = parsed;
+    } catch {
+      /* optional attachment — ignore invalid JSON */
+    }
+  }
+  return Object.keys(out).length ? out : null;
+}
+
 async function ingestReportArtifact(opts: {
   formData: FormData;
   project: typeof projects.$inferSelect;
@@ -244,10 +268,13 @@ async function ingestReportArtifact(opts: {
   const reportFilename =
     reportFile instanceof File ? reportFile.name : "report.md";
 
+  const auxiliaryConfigs = await extractAuxiliaryStrategyConfigs(formData);
+
   const parsed = parseReportForIngest(reportMarkdown, {
     skillType,
     skillParserConfig,
     override,
+    auxiliaryConfigs,
   });
   const topRecommendations = providedTopRecommendations;
   const findingsForRun = mergeFindingsWithTopRecommendations(

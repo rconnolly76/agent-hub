@@ -7,6 +7,8 @@ import {
   type SkillParserConfig,
   type SkillParserEntry,
 } from "./types";
+import { parseFeatureRoadmapReport } from "./feature-roadmap";
+import { parseProductBacklogReport } from "./product-backlog";
 
 const DEFAULT_FALLBACK_MAX = 100_000;
 
@@ -45,8 +47,17 @@ function resolveParserId(skillType: string, entry: SkillParserEntry): string {
   return raw;
 }
 
+export type AuxiliaryIngestConfigs = {
+  /** Parsed `config:roadmap.json` from multipart ingest (optional). */
+  roadmapJson?: unknown;
+  /** Parsed `config:backlog.json` from multipart ingest (optional). */
+  backlogJson?: unknown;
+};
+
 /**
  * Runs the appropriate parser for an ingested report using project config and optional per-run override.
+ * Strategy skills accept optional structured JSON (uploaded as `config:roadmap.json` / `config:backlog.json`)
+ * to enrich narrative fields such as `userOutcome` on ingest.
  */
 export function parseReportForIngest(
   reportMarkdown: string,
@@ -54,9 +65,10 @@ export function parseReportForIngest(
     skillType: string;
     skillParserConfig?: SkillParserConfig | null;
     override?: SkillParserEntry | null;
+    auxiliaryConfigs?: AuxiliaryIngestConfigs | null;
   }
 ): ParseResult {
-  const { skillType, skillParserConfig, override } = options;
+  const { skillType, skillParserConfig, override, auxiliaryConfigs } = options;
   const entry = mergeEntry(skillParserConfig ?? null, skillType, override ?? undefined);
   const effectiveId = resolveParserId(skillType, entry);
   const maxFb =
@@ -64,6 +76,20 @@ export function parseReportForIngest(
 
   if (effectiveId === GENERIC_PARSER_ID) {
     return parseGenericReport(reportMarkdown, maxFb);
+  }
+
+  if (effectiveId === "feature-roadmap") {
+    return parseFeatureRoadmapReport(
+      reportMarkdown,
+      auxiliaryConfigs?.roadmapJson
+    );
+  }
+
+  if (effectiveId === "product-backlog") {
+    return parseProductBacklogReport(
+      reportMarkdown,
+      auxiliaryConfigs?.backlogJson
+    );
   }
 
   const parser = getParser(effectiveId);

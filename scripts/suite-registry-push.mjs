@@ -1,0 +1,448 @@
+#!/usr/bin/env node
+/**
+ * Agent Hub — suite batch push (registry-driven, product-repo cwd).
+ *
+ * Live outside the application repo: run from the product workspace (or pass --project-root).
+ *
+ * Usage (from product repo root):
+ *   node ../agent-hub/scripts/suite-registry-push.mjs
+ *   node /path/to/suite-registry-push.mjs --project-root /path/to/product-repo
+ *
+ *   node ... -- --skill code-quality-audit
+ *   node ... -- --suite-id <uuid>
+ *   AGENT_HUB_SUITE_RUN_ID=<uuid> node ...
+ *   node ... -- --dry-run
+ *
+ * Env:
+ *   AGENT_HUB_PROJECT_ROOT  — absolute path to product repo (overrides cwd)
+ *
+ * Config (read from product repo):
+ *   .agent-hub.json           endpoint + apiKey
+ *   agent-hub.push.json       optional paths / overrides
+ *   _suite-registry.json      which skills to push
+ */
+import { randomUUID } from "node:crypto";
+import { readFileSync, readdirSync, existsSync, statSync } from "node:fs";
+import { join, basename, normalize, resolve } from "node:path";
+
+const args = process.argv.slice(2);
+
+function resolveProjectRoot() {
+  const env = process.env.AGENT_HUB_PROJECT_ROOT?.trim();
+  if (env) return resolve(env);
+  const i = args.indexOf("--project-root");
+  if (i !== -1 && args[i + 1]) return resolve(String(args[i + 1]).trim());
+  return process.cwd();
+}
+
+const root = resolveProjectRoot();
+try {
+  process.chdir(root);
+} catch (e) {
+  console.error("suite-registry-push: cannot chdir to project root:", root, e.message);
+  process.exit(1);
+}
+
+const dryRun = args.includes("--dry-run") || args.includes("-n");
+const skillFilter =
+  (() => {
+    const i = args.indexOf("--skill");
+    if (i !== -1 && args[i + 1]) return args[i + 1];
+    return null;
+  })();
+
+/** Agent Hub requires suiteRunId to be a UUID with version nibble 1–8 (RFC 4122). */
+function isValidHubSuiteRunId(s) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    String(s).trim(),
+  );
+}
+
+/** Same ID on every run in this process so Hub can group a full suite push. */
+function resolveSuiteRunId() {
+  const i = args.indexOf("--suite-id");
+  if (i !== -1 && args[i + 1]) {
+    const v = String(args[i + 1]).trim();
+    if (!isValidHubSuiteRunId(v)) {
+      console.error(
+        `suite-registry-push: --suite-id must be a UUID (v1–v8). Got: ${JSON.stringify(v)}`,
+      );
+      process.exit(1);
+    }
+    return v;
+  }
+  if (process.env.AGENT_HUB_SUITE_RUN_ID) {
+    const v = String(process.env.AGENT_HUB_SUITE_RUN_ID).trim();
+    if (isValidHubSuiteRunId(v)) return v;
+    console.warn(
+      "suite-registry-push: AGENT_HUB_SUITE_RUN_ID is not a valid Hub suite UUID — generating a new one.",
+    );
+  }
+  const scPathNested = join(root, "_suite-out", "_suite-context.json");
+  const scPath = existsSync(scPathNested) ? scPathNested : join(root, "_suite-context.json");
+  if (existsSync(scPath)) {
+    try {
+      const sc = JSON.parse(readFileSync(scPath, "utf8"));
+      if (sc.suiteRunId) {
+        const v = String(sc.suiteRunId).trim();
+        if (isValidHubSuiteRunId(v)) return v;
+        console.warn(
+          "suite-registry-push: _suite-context.json suiteRunId is not a UUID — generating a new one (update the file for stable suite ids).",
+        );
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  return randomUUID();
+}
+
+const suiteRunId = resolveSuiteRunId();
+
+function readJson(p) {
+  return JSON.parse(readFileSync(join(root, p), "utf8"));
+}
+
+let hubPaths = {};
+if (existsSync(join(root, "agent-hub.push.json"))) {
+  try {
+    hubPaths = readJson("agent-hub.push.json");
+  } catch (e) {
+    console.warn("agent-hub.push.json: invalid JSON, ignoring:", e.message);
+  }
+}
+
+if (!existsSync(join(root, ".agent-hub.json"))) {
+  console.error(
+    "suite-registry-push: .agent-hub.json not found in project root:",
+    root,
+  );
+  process.exit(1);
+}
+
+const cfg = readJson(".agent-hub.json");
+const endpoint = cfg.endpoint.replace(/\/$/, "");
+const apiKey = cfg.apiKey;
+
+function loadOptionalJsonText(absPath) {
+  try {
+    const t = readFileSync(absPath, "utf8");
+    JSON.parse(t);
+    return t;
+  } catch {
+    return null;
+  }
+}
+
+function appendSidecarsFromDir(form, dir) {
+  if (!dir || !existsSync(dir)) return;
+  const rd = join(dir, "_run-detail-contract.json");
+  const tr = join(dir, "_top-5-recommendations.json");
+  const a = loadOptionalJsonText(rd);
+  const b = loadOptionalJsonText(tr);
+  if (a) form.append("runDetailContract", a);
+  if (b) form.append("topRecommendations", b);
+}
+
+function fileField(absPath, filename) {
+  const buf = readFileSync(absPath);
+  const name = filename || basename(absPath);
+  const mime = name.endsWith(".png")
+    ? "image/png"
+    : name.endsWith(".json")
+      ? "application/json"
+      : "text/markdown";
+  return new File([buf], name, { type: mime });
+}
+
+async function postRun(form) {
+  const res = await fetch(`${endpoint}/api/runs`, {
+    method: "POST",
+    headers: { "x-api-key": apiKey },
+    body: form,
+  });
+  const text = await res.text();
+  let json;
+  try {
+    json = JSON.parse(text);
+  } catch {
+    json = { raw: text };
+  }
+  if (!res.ok) {
+    const err = new Error(`HTTP ${res.status}`);
+    err.body = json;
+    throw err;
+  }
+  return json;
+}
+
+function firstExistingReportMd(outputs) {
+  for (const o of outputs) {
+    if (o.endsWith("/")) continue;
+    if (!o.endsWith(".md")) continue;
+    const p = join(root, o);
+    if (existsSync(p)) return o;
+  }
+  return null;
+}
+
+function firstBundleDir(outputs) {
+  for (const o of outputs) {
+    if (!o.endsWith("/")) continue;
+    const dir = join(root, o);
+    const m = join(dir, "_manifest.json");
+    if (existsSync(m) && statSync(dir).isDirectory()) return o;
+  }
+  return null;
+}
+
+/**
+ * Build ordered push jobs from registry + filesystem.
+ * @returns {Array<{ skill: string, kind: 'report'|'bundle', report?: string, bundle?: string, outputs?: string[] }>}
+ */
+function discoverJobs() {
+  if (!existsSync(join(root, "_suite-registry.json"))) {
+    throw new Error("_suite-registry.json not found — add it or run from repo root.");
+  }
+  const reg = readJson("_suite-registry.json");
+  const skills = reg.skills || {};
+  const entries = Object.entries(skills)
+    .filter(([k, v]) => v && v.enabled !== false && k !== "agent-hub-push")
+    .sort((a, b) => (a[1].phase || 0) - (b[1].phase || 0));
+
+  const jobs = [];
+
+  for (const [skillKey, meta] of entries) {
+    const outs = meta.outputs || [];
+    const bundle = firstBundleDir(outs);
+    if (bundle) {
+      jobs.push({ skill: skillKey, kind: "bundle", bundle: bundle.replace(/\/$/, "") });
+      continue;
+    }
+    const report = firstExistingReportMd(outs);
+    if (!report) continue;
+
+    jobs.push({ skill: skillKey, kind: "report", report: report, outputs: outs });
+  }
+
+  const hasReviewer = jobs.some((j) => j.skill === "ux-journey-reviewer");
+  const jrReport = ["_suite-out/ux-journey-report.md", "ux-journey-report.md"].find(
+    (p) => existsSync(join(root, p)),
+  );
+  const jrMap = ["_suite-out/ux-journeys.md", "ux-journeys.md"].find((p) =>
+    existsSync(join(root, p)),
+  );
+  if (!hasReviewer && jrReport && jrMap) {
+    jobs.push({
+      skill: "ux-journey-reviewer",
+      kind: "report",
+      report: jrReport,
+      outputs: [],
+    });
+  }
+
+  return jobs;
+}
+
+/** Skip registry paths that are dirs, the report .md, or sidecar-only folders. */
+function shouldAttachOutputJson(rel, reportFile) {
+  const r = String(rel).trim().replace(/\/$/, "");
+  if (!r.endsWith(".json")) return false;
+  if (r.endsWith("/")) return false;
+  if (r === reportFile) return false;
+  if (r.startsWith(".agent-hub-sidecars/")) return false;
+  if (r.includes("/.agent-hub-sidecars/")) return false;
+  return true;
+}
+
+/**
+ * Attach `config:<relPath>` for each JSON file listed in this skill’s registry `outputs`.
+ */
+function appendReportJsonFromRegistryOutputs(form, outputs, reportFile, skillKey) {
+  const skipSet = new Set(
+    Array.isArray(hubPaths.skipReportConfigJson)
+      ? hubPaths.skipReportConfigJson
+      : [],
+  );
+  const extra =
+    (hubPaths.reportConfigFiles && hubPaths.reportConfigFiles[skillKey]) || [];
+  const list = [...new Set([...(outputs || []), ...extra])];
+
+  const seenKeys = new Set();
+  for (const rel of list) {
+    if (!shouldAttachOutputJson(rel, reportFile)) continue;
+    if (skipSet.has(rel)) continue;
+    const safeRel = normalize(rel).replace(/^\.\//, "");
+    const abs = join(root, safeRel);
+    if (!existsSync(abs) || !statSync(abs).isFile()) continue;
+    try {
+      JSON.parse(readFileSync(abs, "utf8"));
+    } catch {
+      console.warn(
+        `suite-registry-push: skip invalid JSON, not attaching config: ${safeRel}`,
+      );
+      continue;
+    }
+    const key = `config:${safeRel}`;
+    if (seenKeys.has(key)) continue;
+    seenKeys.add(key);
+    form.append(key, fileField(abs, basename(safeRel)));
+  }
+}
+
+async function pushReportJob(job) {
+  const skillType = job.skill;
+  const reportPath = join(root, job.report);
+  const form = new FormData();
+  form.append("skillType", skillType);
+  form.append("suiteRunId", suiteRunId);
+  form.append("report", fileField(reportPath));
+
+  const sidecarMap = hubPaths.reportSidecars || {};
+  const sideDir = sidecarMap[skillType]
+    ? join(root, sidecarMap[skillType])
+    : null;
+
+  appendReportJsonFromRegistryOutputs(
+    form,
+    job.outputs,
+    job.report,
+    skillType,
+  );
+
+  if (skillType === "ux-journey-reviewer") {
+    const jr = hubPaths.uxJourneyReviewer || {};
+    const mapPath = jr.journeysPath || "ux-journeys.md";
+    if (existsSync(join(root, mapPath))) {
+      form.append("journeyMap", fileField(join(root, mapPath)));
+    }
+    const cfgDir = jr.configsDir ? join(root, jr.configsDir) : join(root, "ux-journey-configs");
+    if (existsSync(cfgDir)) {
+      for (const name of readdirSync(cfgDir).filter((f) => f.endsWith(".json"))) {
+        form.append(`config:${name}`, fileField(join(cfgDir, name), name));
+      }
+    }
+    const shotDir = jr.screenshotsDir
+      ? join(root, jr.screenshotsDir)
+      : join(root, "ux-journey-screenshots");
+    if (existsSync(shotDir)) {
+      for (const name of readdirSync(shotDir)) {
+        if (!name.endsWith(".png")) continue;
+        form.append(`screenshot:${name}`, fileField(join(shotDir, name), name));
+      }
+    }
+    const jrSideNested = join(root, "_suite-out", ".agent-hub-sidecars", "ux-journey-reviewer");
+    const jrSide =
+      existsSync(jrSideNested) && statSync(jrSideNested).isDirectory()
+        ? jrSideNested
+        : join(root, ".agent-hub-sidecars", "ux-journey-reviewer");
+    if (existsSync(jrSide)) appendSidecarsFromDir(form, jrSide);
+    return postRun(form);
+  }
+
+  if (sidecarMap[skillType]) {
+    appendSidecarsFromDir(form, sideDir);
+  } else {
+    const nested = join(root, "_suite-out", ".agent-hub-sidecars", skillType);
+    const opt = existsSync(nested) && statSync(nested).isDirectory()
+      ? nested
+      : join(root, ".agent-hub-sidecars", skillType);
+    if (existsSync(opt)) appendSidecarsFromDir(form, opt);
+  }
+
+  return postRun(form);
+}
+
+async function pushBundleJob(job) {
+  const skillType = job.skill;
+  const bundleDir = join(root, job.bundle);
+  const manifestPath = join(bundleDir, "_manifest.json");
+  const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+  const form = new FormData();
+  form.append("skillType", skillType);
+  form.append("suiteRunId", suiteRunId);
+  form.append("artifactType", "content-bundle");
+  form.append("manifest", fileField(manifestPath, "_manifest.json"));
+  appendSidecarsFromDir(form, bundleDir);
+  for (const entry of manifest.files || []) {
+    const rel = entry.path;
+    const abs = join(bundleDir, rel);
+    if (!existsSync(abs)) {
+      console.warn(`[${skillType}] skip missing manifest file: ${rel}`);
+      continue;
+    }
+    form.append(`content:${rel}`, fileField(abs, basename(rel)));
+  }
+  return postRun(form);
+}
+
+let jobs;
+try {
+  jobs = discoverJobs();
+} catch (e) {
+  console.error(e.message || e);
+  process.exitCode = 1;
+  process.exit();
+}
+
+if (skillFilter) {
+  jobs = jobs.filter((j) => j.skill === skillFilter);
+}
+
+if (jobs.length === 0) {
+  console.log(
+    JSON.stringify(
+      { projectRoot: root, endpoint, message: "nothing to push (no matching artifacts)", filter: skillFilter },
+      null,
+      2,
+    ),
+  );
+  process.exit(0);
+}
+
+console.log(
+  JSON.stringify(
+    {
+      projectRoot: root,
+      endpoint,
+      dryRun,
+      suiteRunId,
+      apiKeyPrefix: `${String(apiKey).slice(0, 8)}...`,
+      jobs: jobs.map((j) => ({ skill: j.skill, kind: j.kind, artifact: j.report || j.bundle })),
+    },
+    null,
+    2,
+  ),
+);
+
+if (dryRun) process.exit(0);
+
+const results = [];
+const errors = [];
+
+for (const job of jobs) {
+  try {
+    const data =
+      job.kind === "bundle" ? await pushBundleJob(job) : await pushReportJob(job);
+    results.push({ skill: job.skill, ok: true, data });
+    console.log(`ok\t${job.skill}\t${data?.id || data?.runId || ""}`);
+  } catch (e) {
+    errors.push({ skill: job.skill, message: e.message, body: e.body });
+    console.error(`fail\t${job.skill}\t${e.message}`);
+  }
+}
+
+console.log(
+  JSON.stringify(
+    {
+      pushed: results.length,
+      failed: errors.length,
+      results,
+      errors,
+    },
+    null,
+    2,
+  ),
+);
+
+if (errors.length) process.exitCode = 1;

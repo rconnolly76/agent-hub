@@ -3,7 +3,7 @@ import { buildRunDetailContractFromReport } from "@/lib/run-detail-contract";
 import type { ParseResult, ParsedFinding, ParsedMetric } from "./ux-journey-reviewer";
 
 const BL_HEADING =
-  /^###\s+(BL-\d+)\s*[—\-–]\s*(.+?)\s*$/gm;
+  /^###\s+(BL-\d+)\s*[—\-–]\s*(.+?)(?:\s+\*\([^)]+\)\*)?\s*$/gm;
 
 /** Lines like: | 1 | BL-014 | Title | now | 210 | */
 const BL_TABLE_ROW =
@@ -16,6 +16,15 @@ function firstParagraph(text: string): string {
   return para.replace(/\n/g, " ").trim().slice(0, 3500);
 }
 
+function inferHorizonFromHeadingContext(md: string, blockStart: number): string | undefined {
+  const before = md.slice(0, blockStart);
+  const sec = before.match(/##\s+(Now|Next|Later|Gated)\b/gi);
+  if (!sec || sec.length === 0) return undefined;
+  const last = sec[sec.length - 1].replace(/##\s+/i, "").trim().toLowerCase();
+  if (last === "gated") return "gated";
+  return last;
+}
+
 function inferHorizonFromBlock(block: string): string | undefined {
   const m =
     block.match(/\*\*Horizon:?\*\*?\s*:?\s*(now|next|later|gated)/i) ||
@@ -25,11 +34,25 @@ function inferHorizonFromBlock(block: string): string | undefined {
 
 /** Pulls skill-contract fields from per-item markdown for Hub “who / why” display. */
 function extractBacklogSemantics(block: string): {
+  userOutcome?: string;
   userStory?: string;
   problem?: string;
   epic?: string;
   theme?: string;
+  whatItIs?: string;
+  whyItMatters?: string;
+  deliveryNote?: string;
 } {
+  const whatItIs =
+    block.match(/-\s*\*\*What it is:?\*\*\s*([^\n]+)/i)?.[1]?.trim() ||
+    block.match(/\*\*What it is:?\*\*\s*([^\n]+)/i)?.[1]?.trim();
+  const whyItMatters =
+    block.match(/-\s*\*\*Why it matters:?\*\*\s*([^\n]+)/i)?.[1]?.trim() ||
+    block.match(/\*\*Why it matters:?\*\*\s*([^\n]+)/i)?.[1]?.trim();
+  const deliveryNote =
+    block.match(/-\s*\*\*Delivery[^:]*:\*\*\s*([^\n]+)/i)?.[1]?.trim() ||
+    block.match(/\*\*Delivery[^:]*:\*\*\s*([^\n]+)/i)?.[1]?.trim();
+
   const userStory =
     block.match(/\*\*User [Ss]tory:?\*\*\s*([^\n]+)/)?.[1]?.trim() ||
     block.match(/^User story:\s*([^\n]+)/im)?.[1]?.trim();
@@ -40,11 +63,70 @@ function extractBacklogSemantics(block: string): {
   const theme =
     block.match(/\*\*Theme:?\*\*\s*([^\n]+)/)?.[1]?.trim() ||
     block.match(/\*\*Theme\s*\(T\d+\):?\*\*\s*([^\n]+)/)?.[1]?.trim();
-  return { userStory, problem, epic, theme };
+
+  const userOutcome = whatItIs || userStory;
+
+  return {
+    userOutcome,
+    userStory,
+    problem,
+    epic,
+    theme,
+    whatItIs,
+    whyItMatters,
+    deliveryNote,
+  };
+}
+
+type BacklogItemJson = {
+  id?: string;
+  userOutcome?: string;
+  title?: string;
+  epic?: string;
+  themeId?: string;
+  horizon?: string;
+};
+
+type BacklogJsonFile = {
+  items?: BacklogItemJson[];
+};
+
+function mergeBacklogJsonFindings(
+  base: ParsedFinding[],
+  json: BacklogJsonFile | null | undefined
+): ParsedFinding[] {
+  if (!json?.items?.length) return base;
+
+  const byId = new Map<string, BacklogItemJson>();
+  for (const it of json.items) {
+    const id = it.id?.toUpperCase();
+    if (id) byId.set(id, it);
+  }
+  if (byId.size === 0) return base;
+
+  return base.map((f) => {
+    const idMatch = f.title.match(/^(BL-\d+)/i);
+    const id = idMatch?.[1]?.toUpperCase();
+    const row = id ? byId.get(id) : undefined;
+    if (!row?.userOutcome?.trim()) return f;
+    const uo = row.userOutcome.trim();
+    const prev = f.recommendation ?? {};
+    const epic =
+      typeof row.epic === "string" ? row.epic : prev.epic;
+    return {
+      ...f,
+      recommendation: {
+        ...prev,
+        userOutcome: uo,
+        what: prev.what || uo,
+        ...(epic !== undefined ? { epic } : {}),
+      },
+    };
+  });
 }
 
 /**
- * `Per-Item Detail` → `### BL-014 — Title` blocks (authoritative per skill contract).
+ * `## Now` / `## Per-Item Detail` → `### BL-014 — Title` blocks (skill contract).
  */
 function extractFromPerItemHeadings(md: string): ParsedFinding[] {
   const section = md.match(
@@ -64,12 +146,19 @@ function extractFromPerItemHeadings(md: string): ParsedFinding[] {
         ? (matches[i + 1].index ?? searchIn.length)
         : searchIn.length;
     const block = searchIn.slice(blockStart, next);
-    const horizon = inferHorizonFromBlock(block);
+    const horizon =
+      inferHorizonFromBlock(block) ||
+      inferHorizonFromHeadingContext(searchIn, m.index ?? 0);
     const sem = extractBacklogSemantics(block);
     const description = firstParagraph(block);
 
-    const what = sem.userStory || shortTitle;
-    const why = sem.problem || description || shortTitle;
+    const userOutcome = sem.userOutcome?.trim();
+    const what = userOutcome || sem.userStory || shortTitle;
+    const why =
+      sem.whyItMatters?.trim() ||
+      sem.problem ||
+      (description !== shortTitle ? description : "") ||
+      shortTitle;
     const whoLine = sem.epic || sem.theme;
 
     findings.push({
@@ -78,6 +167,7 @@ function extractFromPerItemHeadings(md: string): ParsedFinding[] {
       description: description || shortTitle,
       category: horizon ? `backlog-${horizon}` : "backlog",
       recommendation: {
+        userOutcome: userOutcome || undefined,
         what,
         why: why !== what ? why : description || undefined,
         epic: sem.epic,
@@ -190,13 +280,20 @@ function extractBacklogMetrics(findings: ParsedFinding[]): ParsedMetric[] {
   return metrics;
 }
 
-export function parseProductBacklogReport(markdown: string): ParseResult {
+export function parseProductBacklogReport(
+  markdown: string,
+  backlogJson?: unknown
+): ParseResult {
   let findings = extractFromPerItemHeadings(markdown);
   if (findings.length === 0) {
     findings = extractFromPriorityTables(markdown);
   }
   if (findings.length === 0) {
     findings = extractFromPipeFallback(markdown);
+  }
+
+  if (backlogJson && typeof backlogJson === "object") {
+    findings = mergeBacklogJsonFindings(findings, backlogJson as BacklogJsonFile);
   }
 
   const metrics = extractBacklogMetrics(findings);

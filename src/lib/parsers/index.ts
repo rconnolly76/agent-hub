@@ -6,5 +6,9 @@ export {
 export type { SkillParserEntry, SkillParserConfig } from "./types";
 export { GENERIC_PARSER_ID } from "./types";
 export { parseSkillParserConfig, parseSkillParserOverride } from "./config";
-export { parseReportForIngest, parseGenericReport } from "./ingest";
+export {
+  parseReportForIngest,
+  parseGenericReport,
+  type AuxiliaryIngestConfigs,
+} from "./ingest";
 export { extractExecutiveSummarySection } from "./executive-summary";

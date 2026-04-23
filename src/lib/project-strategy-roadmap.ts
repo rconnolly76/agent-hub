@@ -18,6 +18,8 @@ export type StrategyRoadmapRow = {
 };
 
 type Rec = {
+  /** Plain-language user outcome (preferred for “What” in the strategy UI). */
+  userOutcome?: string;
   what?: string;
   why?: string;
   theme?: string;
@@ -75,6 +77,7 @@ function buildRow(
   );
 
   const what =
+    rec.userOutcome?.trim() ||
     rec.what?.trim() ||
     headline ||
     f.title;
