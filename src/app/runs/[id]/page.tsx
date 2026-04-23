@@ -2,7 +2,6 @@ import { db } from "@/lib/db";
 import { artifacts, metrics, findings } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
-import Link from "next/link";
 import { MarkdownReport } from "@/components/MarkdownReport";
 import { MarkdownSummary } from "@/components/MarkdownSummary";
 import { MetricsSidebar } from "@/components/MetricsSidebar";
@@ -17,7 +16,14 @@ import {
 } from "@/lib/run-detail-contract";
 import { parseTopRecommendationsPayload } from "@/lib/top-recommendations";
 import { getSkillFamilyForRun } from "@/lib/run-skill-family";
-import { FindingsTriage } from "@/components/FindingsTriage";
+import { RunDetailCommandShell } from "@/components/run-detail/RunDetailCommandShell";
+import { RunDetailSlimHeader } from "@/components/run-detail/RunDetailSlimHeader";
+import { VerdictStrip } from "@/components/run-detail/VerdictStrip";
+import { RunSectionNav, type NavSectionDef } from "@/components/run-detail/run-detail-nav";
+import { RunFindingsKanban } from "@/components/run-detail/RunFindingsKanban";
+import { FindingInspector } from "@/components/run-detail/FindingInspector";
+import { RunCoverageSummary } from "@/components/run-detail/RunCoverageSummary";
+import { worstSeverity } from "@/components/run-detail/run-detail-tokens";
 
 export const dynamic = "force-dynamic";
 
@@ -92,6 +98,36 @@ function formatDate(date: Date): string {
   return `${weekday}, ${month} ${day}, ${year} at ${h}:${m} ${ampm}`;
 }
 
+function firstSentence(text: string): string {
+  const t = text.trim();
+  if (!t) return "";
+  const m = t.match(/^[^.!?]+[.!?]?/);
+  return m ? m[0].trim() : t.slice(0, 200);
+}
+
+function countSeverities(rows: { severity: string }[]) {
+  let critical = 0;
+  let warning = 0;
+  let mixed = 0;
+  let low = 0;
+  for (const f of rows) {
+    const s = f.severity.toLowerCase();
+    if (s === "critical") critical++;
+    else if (s === "warning") warning++;
+    else if (s === "investigate" || s === "info") mixed++;
+    else low++;
+  }
+  return { critical, warning, mixed, low };
+}
+
+function hasCoverageMetrics(
+  m: { key: string; value: number; unit: string | null }[],
+): boolean {
+  return m.some((x) =>
+    ["steps_total", "steps_completed", "journeys_total"].includes(x.key),
+  );
+}
+
 export default async function RunDetailPage({
   params,
 }: {
@@ -149,7 +185,8 @@ export default async function RunDetailPage({
     }
   }
 
-  const contentFileData: { filename: string; blobUrl: string; content: string }[] = [];
+  const contentFileData: { filename: string; blobUrl: string; content: string }[] =
+    [];
   if (isContentBundle && contentArtifacts.length > 0) {
     const fetches = contentArtifacts.map(async (a) => {
       try {
@@ -175,7 +212,7 @@ export default async function RunDetailPage({
     ? extractReportSections(reportContent, ["Executive Summary"])
     : [];
   const contractFromMetadata = parseRunDetailContract(
-    rawMeta?.runDetailContract ?? null
+    rawMeta?.runDetailContract ?? null,
   );
   const derivedContractFromReport =
     !contractFromMetadata && reportContent
@@ -195,14 +232,8 @@ export default async function RunDetailPage({
   const effectiveRunDetailContract =
     contractFromMetadata ?? derivedContractFromReport ?? derivedContractFromManifest;
   const topRecommendations =
-    parseTopRecommendationsPayload(rawMeta?.topRecommendations ?? null)?.recommendations ?? [];
-
-  const statusTone =
-    run.status === "completed"
-      ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
-      : run.status === "failed"
-        ? "bg-red-500/10 text-red-600 border-red-500/20"
-        : "bg-amber-500/10 text-amber-600 border-amber-500/20";
+    parseTopRecommendationsPayload(rawMeta?.topRecommendations ?? null)?.recommendations ??
+    [];
 
   const skillFamily = getSkillFamilyForRun(run.skillType, run.rawMetadata);
   const showFindingsTriage =
@@ -211,233 +242,237 @@ export default async function RunDetailPage({
       skillFamily === "browser" ||
       skillFamily === "discovery");
 
+  const skillLabel = formatSkillType(run.skillType);
+  const dateLabel = formatDate(run.createdAt);
+  const sevCounts = countSeverities(runFindings);
+  const worst = worstSeverity(runFindings);
+  const showCoverage = hasCoverageMetrics(runMetrics);
+
+  const verdictHeadline = run.executiveSummary?.trim()
+    ? firstSentence(run.executiveSummary)
+    : runFindings.length > 0
+      ? `Review ${runFindings.length} finding${runFindings.length === 1 ? "" : "s"} below.`
+      : `${skillLabel} run completed — review metrics and artifacts below.`;
+
+  const navSections: NavSectionDef[] = [];
+
+  const overview: NavSectionDef["items"] = [];
+  if (run.executiveSummary) {
+    overview.push({ href: "#summary", label: "Executive summary" });
+  }
+  if (topRecommendations.length > 0) {
+    overview.push({
+      href: "#top-recommendations",
+      label: "Top recommendations",
+    });
+  }
+  if (overview.length > 0) {
+    navSections.push({ title: "Overview", items: overview });
+  }
+
+  if (showFindingsTriage) {
+    const triageItems: NavSectionDef["items"] = [
+      {
+        href: "#findings-triage",
+        label: "All findings",
+        count: runFindings.length,
+      },
+      ...(sevCounts.critical > 0
+        ? [{ href: "#findings-triage", label: "Critical", count: sevCounts.critical }]
+        : []),
+      ...(sevCounts.warning > 0
+        ? [{ href: "#findings-triage", label: "Warning", count: sevCounts.warning }]
+        : []),
+      ...(sevCounts.mixed > 0
+        ? [
+            {
+              href: "#findings-triage",
+              label: "Investigate",
+              count: sevCounts.mixed,
+            },
+          ]
+        : []),
+    ];
+    if (triageItems.length > 0) {
+      navSections.push({ title: "Triage", items: triageItems });
+    }
+  }
+
+  const reportItems: NavSectionDef["items"] = [];
+  if (
+    reportContent &&
+    !(isContentBundle && reportArtifact?.filename === "bundle-overview.md")
+  ) {
+    reportItems.push({ href: "#report", label: "Full report" });
+    for (const s of reportSections) {
+      reportItems.push({ href: `#${s.slug}`, label: s.title });
+    }
+  }
+  if (showCoverage) {
+    reportItems.push({ href: "#coverage-steps", label: "Coverage" });
+  }
+  if (reportItems.length > 0) {
+    navSections.push({ title: "Report", items: reportItems });
+  }
+
+  const evidence: NavSectionDef["items"] = [];
+  if (isContentBundle && contentFileData.length > 0) {
+    evidence.push({ href: "#content-bundle", label: "Content bundle" });
+  }
+  if (screenshots.length > 0) {
+    evidence.push({
+      href: "#screenshots",
+      label: "Screenshots",
+      count: screenshots.length,
+    });
+  }
+  evidence.push({ href: "#metrics", label: "Metrics & signals" });
+  if (evidence.length > 0) {
+    navSections.push({ title: "Evidence", items: evidence });
+  }
+
+  const findingInspectorData = runFindings.map((f) => ({
+    id: f.id,
+    severity: f.severity,
+    title: f.title,
+    description: f.description,
+    category: f.category,
+    status: f.status,
+    recommendation: f.recommendation,
+  }));
+
+  const kanbanFindings = runFindings.map((f) => ({
+    id: f.id,
+    severity: f.severity,
+    title: f.title,
+    category: f.category,
+  }));
+
+  const mainColumn = (
+    <div className="p-5 md:p-6 space-y-8">
+      {(run.executiveSummary || runFindings.length > 0) && (
+        <VerdictStrip
+          headline={verdictHeadline}
+          worstSeverity={worst}
+          linkToSummary={Boolean(run.executiveSummary)}
+        />
+      )}
+
+      {showFindingsTriage && <RunFindingsKanban findings={kanbanFindings} />}
+
+      <RunCoverageSummary metrics={runMetrics} />
+
+      {run.executiveSummary && (
+        <section id="summary" className="rounded-lg border border-border bg-card/40 px-6 py-5">
+          <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
+            Executive summary
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4 text-xs">
+            <div className="rounded-md border border-border bg-background/60 px-3 py-2">
+              <p className="text-muted-foreground">Run date</p>
+              <p className="font-medium text-foreground mt-0.5">{dateLabel}</p>
+            </div>
+            <div className="rounded-md border border-border bg-background/60 px-3 py-2">
+              <p className="text-muted-foreground">Artifact type</p>
+              <p className="font-medium text-foreground mt-0.5">{artifactTypeLabel}</p>
+            </div>
+          </div>
+          <MarkdownSummary content={run.executiveSummary} />
+        </section>
+      )}
+
+      {topRecommendations.length > 0 && (
+        <section id="top-recommendations" className="rounded-lg border border-border bg-card/40 px-6 py-5">
+          <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
+            Top recommendations
+          </h2>
+          <div className="space-y-2">
+            {topRecommendations.map((item) => (
+              <div
+                key={item.priority}
+                className="rounded-md border border-border bg-background/60 p-3"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-medium text-foreground">{item.title}</p>
+                  <span className="text-[10px] uppercase tracking-wider text-muted-foreground border border-border rounded px-1.5 py-0.5">
+                    {item.priority}
+                  </span>
+                </div>
+                <p className="text-sm text-muted-foreground mt-1">{item.action}</p>
+                {item.rationale && (
+                  <p className="text-xs text-muted-foreground/80 mt-1.5">{item.rationale}</p>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {isContentBundle && rawMeta.manifest && contentFileData.length > 0 && (
+        <section id="content-bundle">
+          <ContentBundleViewer
+            manifest={rawMeta.manifest}
+            contentFiles={contentFileData}
+          />
+        </section>
+      )}
+
+      {reportContent &&
+      !(isContentBundle && reportArtifact?.filename === "bundle-overview.md") ? (
+        <section id="report" className={isContentBundle ? "pt-2" : ""}>
+          <MarkdownReport
+            content={reportContent}
+            screenshotUrls={screenshotUrls}
+            excludeSections={["Executive Summary"]}
+            showTableOfContents={false}
+          />
+        </section>
+      ) : !isContentBundle && !reportContent ? (
+        <p className="text-muted-foreground">No report content available.</p>
+      ) : null}
+
+      {screenshots.length > 0 && (
+        <section id="screenshots">
+          <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-4">
+            Screenshots
+          </h2>
+          <ScreenshotGallery screenshots={screenshots} />
+        </section>
+      )}
+    </div>
+  );
+
+  const metricsAside = (
+    <div id="metrics" className="space-y-4 xl:sticky xl:top-[calc(4rem+1.5rem)]">
+      {showFindingsTriage && <FindingInspector findings={findingInspectorData} />}
+      <MetricsSidebar
+        metrics={runMetrics}
+        findings={runFindings}
+        skillType={run.skillType}
+        runDetailContract={effectiveRunDetailContract}
+        linkSections={Boolean(reportContent)}
+        skillFamily={skillFamily}
+        omitFindingsList={showFindingsTriage}
+      />
+    </div>
+  );
+
   return (
-    <div className="space-y-6">
-      <div className="rounded-xl border border-border bg-card/40 px-5 py-5 md:px-6">
-        <Link
-          href={`/projects/${run.project.id}`}
-          className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors group uppercase tracking-wider"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="transition-transform group-hover:-translate-x-0.5"
-          >
-            <path d="m15 18-6-6 6-6" />
-          </svg>
-          Projects / {run.project.name}
-        </Link>
-
-        <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
-          <div className="min-w-0">
-            <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-balance">
-              {formatSkillType(run.skillType)} Run
-            </h1>
-            <p className="text-sm text-muted-foreground mt-2">
-              {formatDate(run.createdAt)}
-            </p>
-          </div>
-          <span
-            className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium capitalize ${statusTone}`}
-          >
-            {run.status}
-          </span>
-        </div>
-
-        <div className="mt-4 grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-2 text-xs">
-          <div className="rounded-md border border-border bg-background/60 px-3 py-2">
-            <p className="text-muted-foreground">Artifact Type</p>
-            <p className="font-medium text-foreground mt-0.5">{artifactTypeLabel}</p>
-          </div>
-          <div className="rounded-md border border-border bg-background/60 px-3 py-2">
-            <p className="text-muted-foreground">Skill</p>
-            <p className="font-medium text-foreground mt-0.5">{formatSkillType(run.skillType)}</p>
-          </div>
-          <div className="rounded-md border border-border bg-background/60 px-3 py-2">
-            <p className="text-muted-foreground">Findings</p>
-            <p className="font-medium text-foreground mt-0.5">{runFindings.length}</p>
-          </div>
-          <div className="rounded-md border border-border bg-background/60 px-3 py-2">
-            <p className="text-muted-foreground">Suite</p>
-            <p className="font-medium text-foreground mt-0.5 font-mono text-[11px] break-all">
-              {rawMeta?.suiteRunId
-                ? `${rawMeta.suiteRunId.slice(0, 8)}…`
-                : "—"}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 xl:grid-cols-[220px_minmax(0,1fr)_280px] gap-6">
-        <aside className="hidden xl:block">
-          <div className="sticky top-[calc(4rem+2.5rem+1px)] rounded-lg border border-border bg-card/40 p-4">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
-              On This Page
-            </p>
-            <nav className="space-y-1.5 text-sm">
-              {run.executiveSummary && (
-                <a href="#summary" className="block text-muted-foreground hover:text-foreground transition-colors">
-                  Executive Summary
-                </a>
-              )}
-              {topRecommendations.length > 0 && (
-                <a href="#top-recommendations" className="block text-muted-foreground hover:text-foreground transition-colors">
-                  Top Recommendations
-                </a>
-              )}
-              {showFindingsTriage && (
-                <a
-                  href="#findings-triage"
-                  className="block text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Findings
-                </a>
-              )}
-              {isContentBundle && contentFileData.length > 0 && (
-                <a href="#content-bundle" className="block text-muted-foreground hover:text-foreground transition-colors">
-                  Content Bundle
-                </a>
-              )}
-              {reportContent &&
-                !(isContentBundle && reportArtifact?.filename === "bundle-overview.md") && (
-                <>
-                  <a href="#report" className="block text-muted-foreground hover:text-foreground transition-colors">
-                    Report
-                  </a>
-                  {reportSections.length > 0 && (
-                    <div className="pl-3 border-l border-border space-y-1 pt-1">
-                      {reportSections.map((section) => (
-                        <a
-                          key={section.slug}
-                          href={`#${section.slug}`}
-                          className="block text-xs text-muted-foreground/90 hover:text-foreground transition-colors"
-                        >
-                          {section.title}
-                        </a>
-                      ))}
-                    </div>
-                  )}
-                </>
-              )}
-              {screenshots.length > 0 && (
-                <a href="#screenshots" className="block text-muted-foreground hover:text-foreground transition-colors">
-                  Screenshots
-                </a>
-              )}
-              <a href="#metrics" className="block text-muted-foreground hover:text-foreground transition-colors">
-                Metrics & Findings
-              </a>
-            </nav>
-          </div>
-        </aside>
-
-        <div className="min-w-0 space-y-8">
-          {run.executiveSummary && (
-            <section id="summary" className="rounded-lg border border-border bg-card/40 px-6 py-5">
-              <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
-                Executive Summary
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4 text-xs">
-                <div className="rounded-md border border-border bg-background/60 px-3 py-2">
-                  <p className="text-muted-foreground">Run Date</p>
-                  <p className="font-medium text-foreground mt-0.5">{formatDate(run.createdAt)}</p>
-                </div>
-                <div className="rounded-md border border-border bg-background/60 px-3 py-2">
-                  <p className="text-muted-foreground">Artifact Type</p>
-                  <p className="font-medium text-foreground mt-0.5">{artifactTypeLabel}</p>
-                </div>
-              </div>
-              <MarkdownSummary content={run.executiveSummary} />
-            </section>
-          )}
-
-          {topRecommendations.length > 0 && (
-            <section id="top-recommendations" className="rounded-lg border border-border bg-card/40 px-6 py-5">
-              <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
-                Top 5 Recommendations
-              </h2>
-              <div className="space-y-2">
-                {topRecommendations.map((item) => (
-                  <div key={item.priority} className="rounded-md border border-border bg-background/60 p-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="text-sm font-medium text-foreground">{item.title}</p>
-                      <span className="text-[10px] uppercase tracking-wider text-muted-foreground border border-border rounded px-1.5 py-0.5">
-                        {item.priority}
-                      </span>
-                    </div>
-                    <p className="text-sm text-muted-foreground mt-1">{item.action}</p>
-                    {item.rationale && (
-                      <p className="text-xs text-muted-foreground/80 mt-1.5">{item.rationale}</p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {showFindingsTriage && (
-            <FindingsTriage
-              findings={runFindings.map((f) => ({
-                id: f.id,
-                severity: f.severity,
-                title: f.title,
-                category: f.category,
-              }))}
-            />
-          )}
-
-          {isContentBundle &&
-            rawMeta.manifest &&
-            contentFileData.length > 0 && (
-              <section id="content-bundle">
-                <ContentBundleViewer
-                  manifest={rawMeta.manifest}
-                  contentFiles={contentFileData}
-                />
-              </section>
-            )}
-
-          {reportContent && !(isContentBundle && reportArtifact?.filename === "bundle-overview.md") ? (
-            <section id="report" className={isContentBundle ? "pt-2" : ""}>
-              <MarkdownReport
-                content={reportContent}
-                screenshotUrls={screenshotUrls}
-                excludeSections={["Executive Summary"]}
-                showTableOfContents={false}
-              />
-            </section>
-          ) : !isContentBundle && !reportContent ? (
-            <p className="text-muted-foreground">No report content available</p>
-          ) : null}
-
-          {screenshots.length > 0 && (
-            <section id="screenshots">
-              <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-4">Screenshots</h2>
-              <ScreenshotGallery screenshots={screenshots} />
-            </section>
-          )}
-        </div>
-
-        <aside id="metrics" className="xl:order-last">
-          <div className="xl:sticky xl:top-[calc(4rem+2.5rem+1px)]">
-            <MetricsSidebar
-              metrics={runMetrics}
-              findings={runFindings}
-              skillType={run.skillType}
-              runDetailContract={effectiveRunDetailContract}
-              linkSections={Boolean(reportContent)}
-              skillFamily={skillFamily}
-              omitFindingsList={showFindingsTriage}
-            />
-          </div>
-        </aside>
+    <div className="space-y-6 pb-8">
+      <div className="rounded-lg border border-border overflow-hidden bg-card/30">
+        <RunDetailSlimHeader
+          projectId={run.project.id}
+          projectName={run.project.name}
+          runId={run.id}
+          status={run.status}
+          skillLabel={skillLabel}
+          dateLabel={dateLabel}
+        />
+        <RunDetailCommandShell
+          nav={<RunSectionNav sections={navSections} />}
+          main={mainColumn}
+          aside={metricsAside}
+        />
       </div>
     </div>
   );

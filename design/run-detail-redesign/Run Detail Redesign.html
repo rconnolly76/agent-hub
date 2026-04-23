@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Run Detail · Redesign</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #0a0a0a; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", system-ui, sans-serif; color: #fafafa; }
+  * { box-sizing: border-box; }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="data.jsx"></script>
+<script type="text/babel" src="primitives.jsx"></script>
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="dirA.jsx"></script>
+<script type="text/babel" src="dirB.jsx"></script>
+<script type="text/babel" src="dirC.jsx"></script>
+<script type="text/babel" src="dirD.jsx"></script>
+
+<script type="text/babel" data-presets="env,react">
+const TWEAKS = /*EDITMODE-BEGIN*/{
+  "accent": "#8b5cf6",
+  "density": 5,
+  "heroStyle": "balanced",
+  "findingsStyle": "kanban"
+}/*EDITMODE-END*/;
+
+function App() {
+  const [tweaks, setTweaks] = React.useState(TWEAKS);
+  const [editMode, setEditMode] = React.useState(false);
+
+  React.useEffect(() => {
+    const onMsg = (e) => {
+      if (!e.data || typeof e.data !== 'object') return;
+      if (e.data.type === '__activate_edit_mode') setEditMode(true);
+      if (e.data.type === '__deactivate_edit_mode') setEditMode(false);
+    };
+    window.addEventListener('message', onMsg);
+    window.parent.postMessage({ type: '__edit_mode_available' }, '*');
+    return () => window.removeEventListener('message', onMsg);
+  }, []);
+
+  const update = (patch) => {
+    const next = { ...tweaks, ...patch };
+    setTweaks(next);
+    window.parent.postMessage({ type: '__edit_mode_set_keys', edits: patch }, '*');
+  };
+
+  const directions = [
+    { id: 'a', label: 'A · Editorial', component: DirectionA, subtitle: 'Report-first with triage grid' },
+    { id: 'b', label: 'B · Executive dashboard', component: DirectionB, subtitle: 'Health score hero, timeline, KPI stack' },
+    { id: 'c', label: 'C · Command center', component: DirectionC, subtitle: 'Kanban triage with inspector pane' },
+    { id: 'd', label: 'D · Evidence-linked story', component: DirectionD, subtitle: 'Scroll-driven, paired with screenshots' },
+  ];
+
+  return (
+    <>
+      <DesignCanvas>
+        <DCSection id="directions" title="Run Detail · Redesign" subtitle="Four directions for the Run Detail page. Drag by the grip to reorder, click a label to focus.">
+          {directions.map((d) => (
+            <DCArtboard key={d.id} id={d.id} label={d.label} width={1360} height={1700}>
+              <d.component accent={tweaks.accent} density={tweaks.density} heroStyle={tweaks.heroStyle} findingsStyle={tweaks.findingsStyle} />
+            </DCArtboard>
+          ))}
+        </DCSection>
+      </DesignCanvas>
+
+      {editMode && <TweaksPanel tweaks={tweaks} update={update} />}
+    </>
+  );
+}
+
+function TweaksPanel({ tweaks, update }) {
+  const swatches = [
+    { name: 'Violet', color: '#8b5cf6' },
+    { name: 'Blue', color: '#3b82f6' },
+    { name: 'Emerald', color: '#10b981' },
+    { name: 'Rose', color: '#f43f5e' },
+    { name: 'Amber', color: '#f59e0b' },
+    { name: 'Cyan', color: '#06b6d4' },
+  ];
+  return (
+    <div style={{
+      position: 'fixed', bottom: 16, right: 16, zIndex: 9999,
+      width: 280, padding: 16, borderRadius: 12,
+      background: 'rgba(15,15,15,0.92)', border: '1px solid rgba(255,255,255,0.12)',
+      backdropFilter: 'blur(14px)',
+      fontFamily: '-apple-system, system-ui, sans-serif', color: '#fafafa',
+      boxShadow: '0 24px 60px rgba(0,0,0,0.5)',
+      display: 'flex', flexDirection: 'column', gap: 14,
+    }}>
+      <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: 0.4, textTransform: 'uppercase', color: 'rgba(250,250,250,0.85)' }}>Tweaks</div>
+
+      <div>
+        <Label>Accent</Label>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {swatches.map((s) => (
+            <button key={s.color} onClick={() => update({ accent: s.color })} title={s.name}
+              style={{
+                width: 26, height: 26, borderRadius: 7, cursor: 'pointer',
+                background: s.color,
+                border: tweaks.accent === s.color ? '2px solid #fff' : '2px solid rgba(255,255,255,0.12)',
+                boxShadow: tweaks.accent === s.color ? `0 0 0 2px ${s.color}55` : 'none',
+                padding: 0,
+              }} />
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <Label>Density <span style={{ opacity: 0.6, marginLeft: 4, fontWeight: 400 }}>{tweaks.density}</span></Label>
+        <input type="range" min="1" max="8" step="1" value={tweaks.density}
+          onChange={(e) => update({ density: Number(e.target.value) })}
+          style={{ width: '100%', accentColor: tweaks.accent }} />
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'rgba(250,250,250,0.45)' }}>
+          <span>Spacious</span><span>Dense</span>
+        </div>
+      </div>
+
+      <div>
+        <Label>Hero style</Label>
+        <Segmented value={tweaks.heroStyle} onChange={(v) => update({ heroStyle: v })} accent={tweaks.accent}
+          options={[{ v: 'minimal', l: 'Minimal' }, { v: 'balanced', l: 'Balanced' }, { v: 'big', l: 'Big' }]} />
+      </div>
+
+      <div>
+        <Label>Findings treatment</Label>
+        <Segmented value={tweaks.findingsStyle} onChange={(v) => update({ findingsStyle: v })} accent={tweaks.accent}
+          options={[{ v: 'list', l: 'List' }, { v: 'cards', l: 'Cards' }, { v: 'kanban', l: 'Kanban' }, { v: 'table', l: 'Table' }]} />
+      </div>
+
+      <div style={{ fontSize: 10, color: 'rgba(250,250,250,0.45)', marginTop: 2 }}>
+        Hero + Findings tweaks are wired through to all four directions where applicable.
+      </div>
+    </div>
+  );
+}
+
+function Label({ children }) {
+  return <div style={{ fontSize: 11, fontWeight: 500, color: 'rgba(250,250,250,0.75)', marginBottom: 6, display: 'flex', alignItems: 'center' }}>{children}</div>;
+}
+
+function Segmented({ value, onChange, options, accent }) {
+  return (
+    <div style={{
+      display: 'flex', gap: 2, padding: 2, borderRadius: 7,
+      background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+    }}>
+      {options.map((o) => (
+        <button key={o.v} onClick={() => onChange(o.v)} style={{
+          flex: 1, padding: '5px 8px', borderRadius: 5, fontSize: 11, cursor: 'pointer',
+          background: value === o.v ? accent : 'transparent',
+          color: value === o.v ? '#fff' : 'rgba(250,250,250,0.7)',
+          border: 'none', fontWeight: value === o.v ? 600 : 400,
+        }}>{o.l}</button>
+      ))}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
