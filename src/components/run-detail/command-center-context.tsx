@@ -46,6 +46,14 @@ export interface ToastState {
   kind: "success" | "error";
 }
 
+export type FindingFilterKey =
+  | "all"
+  | "critical"
+  | "warning"
+  | "investigate"
+  | "info"
+  | "unpushed";
+
 interface CommandCenterContextValue {
   findings: CCFindingRow[];
   ids: string[];
@@ -63,6 +71,8 @@ interface CommandCenterContextValue {
   openPalette: () => void;
   closePalette: () => void;
   toast: ToastState | null;
+  filter: FindingFilterKey;
+  setFilter: (f: FindingFilterKey) => void;
 }
 
 const CommandCenterContext = createContext<CommandCenterContextValue | null>(null);
@@ -95,6 +105,7 @@ export function CommandCenterProvider({
   const [linearModal, setLinearModal] = useState<LinearModalState | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [toast, setToast] = useState<ToastState | null>(null);
+  const [filter, setFilter] = useState<FindingFilterKey>("all");
 
   const setSelectedId = useCallback(
     (id: string) => {
@@ -245,6 +256,8 @@ export function CommandCenterProvider({
       openPalette,
       closePalette,
       toast,
+      filter,
+      setFilter,
     }),
     [
       findings,
@@ -263,6 +276,7 @@ export function CommandCenterProvider({
       openPalette,
       closePalette,
       toast,
+      filter,
     ],
   );
 

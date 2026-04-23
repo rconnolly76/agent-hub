@@ -303,7 +303,7 @@ export default async function RunDetailPage({
         href: "#findings-triage",
         label: "All findings",
         count: runFindings.length,
-        triageAll: true,
+        filterKey: "all",
       },
       ...(sevCounts.critical > 0
         ? [
@@ -312,7 +312,7 @@ export default async function RunDetailPage({
               href: "#findings-triage",
               label: "Critical",
               count: sevCounts.critical,
-              triageFilter: true,
+              filterKey: "critical" as const,
               severityDot: "critical" as const,
             },
           ]
@@ -324,7 +324,7 @@ export default async function RunDetailPage({
               href: "#findings-triage",
               label: "Warning",
               count: sevCounts.warning,
-              triageFilter: true,
+              filterKey: "warning" as const,
               severityDot: "warning" as const,
             },
           ]
@@ -336,7 +336,7 @@ export default async function RunDetailPage({
               href: "#findings-triage",
               label: "Investigate",
               count: sevCounts.investigate,
-              triageFilter: true,
+              filterKey: "investigate" as const,
               severityDot: "investigate" as const,
             },
           ]
@@ -348,11 +348,17 @@ export default async function RunDetailPage({
               href: "#findings-triage",
               label: "Info & low",
               count: sevCounts.info + sevCounts.low,
-              triageFilter: true,
+              filterKey: "info" as const,
               severityDot: "info" as const,
             },
           ]
         : []),
+      {
+        key: "filter-unpushed",
+        href: "#findings-triage",
+        label: "Unpushed",
+        filterKey: "unpushed" as const,
+      },
     ];
     if (triageItems.length > 0) {
       navSections.push({ title: "Filter", items: triageItems });

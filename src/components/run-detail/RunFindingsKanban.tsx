@@ -36,6 +36,8 @@ export function RunFindingsKanban({
     toggleMulti,
     linearState,
     openLinearModal,
+    filter,
+    setFilter,
   } = useCommandCenter();
 
   const categories = useMemo(() => {
@@ -49,11 +51,26 @@ export function RunFindingsKanban({
   const [cat, setCat] = useState("all");
 
   const filtered = useMemo(() => {
-    if (cat === "all") return rows;
-    return rows.filter(
-      (f) => (f.category?.trim() || "uncategorized") === cat,
-    );
-  }, [rows, cat]);
+    let out = rows;
+    if (cat !== "all") {
+      out = out.filter(
+        (f) => (f.category?.trim() || "uncategorized") === cat,
+      );
+    }
+    if (filter !== "all") {
+      if (filter === "unpushed") {
+        out = out.filter((f) => linearState[f.id]?.status !== "synced");
+      } else if (filter === "info") {
+        out = out.filter((f) => {
+          const s = f.severity.toLowerCase();
+          return s === "info" || s === "low";
+        });
+      } else {
+        out = out.filter((f) => f.severity.toLowerCase() === filter);
+      }
+    }
+    return out;
+  }, [rows, cat, filter, linearState]);
 
   const columns = useMemo(() => {
     const map: Record<string, CCFindingRow[]> = {
@@ -78,7 +95,20 @@ export function RunFindingsKanban({
           </h1>
           <p className="text-xs text-zinc-500/90 mt-0.5">
             {filtered.length} findings
-            {cat !== "all" ? ` · ${cat}` : ""} · press{" "}
+            {cat !== "all" ? ` · ${cat}` : ""}
+            {filter !== "all" ? (
+              <>
+                {" · "}
+                <button
+                  type="button"
+                  onClick={() => setFilter("all")}
+                  className="text-violet-400 hover:text-violet-300 hover:underline"
+                >
+                  filter: {filter} ✕
+                </button>
+              </>
+            ) : null}
+            {" · press "}
             <kbd className="rounded border border-white/10 bg-white/[0.06] px-1 py-px font-mono text-[10px] text-zinc-200/80">
               X
             </kbd>{" "}

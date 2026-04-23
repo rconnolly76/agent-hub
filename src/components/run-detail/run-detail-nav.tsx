@@ -6,6 +6,10 @@ import { Camera, FileStack, Activity, Play } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { severityDot } from "@/components/run-detail/run-detail-tokens";
 import type { RunSectionHealthLevel } from "@/lib/run-detail-contract";
+import {
+  useCommandCenterOptional,
+  type FindingFilterKey,
+} from "@/components/run-detail/command-center-context";
 
 const SECTION_LEVEL_DOT: Record<RunSectionHealthLevel, string> = {
   healthy: "bg-emerald-400 shadow-[0_0_6px_rgba(16,185,129,0.4)]",
@@ -35,6 +39,8 @@ export interface NavLinkItem {
   rowIcon?: NavRowIcon;
   /** Non-link row (e.g. Re-run placeholder) */
   interactive?: boolean;
+  /** When set, the row is a filter button that updates the command-center filter. */
+  filterKey?: FindingFilterKey;
 }
 
 export interface NavSectionDef {
@@ -101,14 +107,17 @@ function NavRow({
   item,
   active,
   children,
+  onFilterClick,
 }: {
   item: NavLinkItem;
   active: boolean;
   children: ReactNode;
+  onFilterClick?: () => void;
 }) {
   const isStatic = item.interactive === false;
+  const isFilter = Boolean(item.filterKey) && Boolean(onFilterClick);
   const className = cn(
-    "flex w-full min-h-[32px] items-center gap-2.5 rounded-md px-2 text-[12.5px] leading-tight",
+    "flex w-full min-h-[32px] items-center gap-2.5 rounded-md px-2 text-[12.5px] leading-tight text-left",
     isStatic
       ? "text-zinc-500/75"
       : "transition-colors",
@@ -122,6 +131,13 @@ function NavRow({
   if (isStatic) {
     return <div className={className}>{children}</div>;
   }
+  if (isFilter) {
+    return (
+      <button type="button" onClick={onFilterClick} className={className}>
+        {children}
+      </button>
+    );
+  }
   return (
     <a href={item.href} className={className}>
       {children}
@@ -131,6 +147,7 @@ function NavRow({
 
 export function RunSectionNav({ sections, className }: RunSectionNavProps) {
   const hash = useHash();
+  const cc = useCommandCenterOptional();
 
   return (
     <nav className={cn("flex h-full min-h-0 flex-col gap-5 bg-black py-3 pl-1 pr-2.5", className)}>
@@ -141,14 +158,28 @@ export function RunSectionNav({ sections, className }: RunSectionNavProps) {
           </p>
           <ul className="flex flex-col gap-px">
             {sec.items.map((it) => {
-              const active = rowIsActive(it, hash);
+              const filterActive =
+                cc && it.filterKey ? cc.filter === it.filterKey : false;
+              const active = it.filterKey
+                ? filterActive
+                : rowIsActive(it, hash);
               const key = it.key ?? `${it.href}::${it.label}`;
               const Ico =
                 it.rowIcon && it.rowIcon !== "none" ? ROW_ICONS[it.rowIcon] : null;
               const hasLeftDot = Boolean(it.severityDot) || it.sectionLevel != null;
+              const onFilterClick =
+                cc && it.filterKey
+                  ? () => {
+                      cc.setFilter(it.filterKey!);
+                      if (typeof window !== "undefined") {
+                        const tgt = document.getElementById("findings-triage");
+                        if (tgt) tgt.scrollIntoView({ behavior: "smooth", block: "start" });
+                      }
+                    }
+                  : undefined;
               return (
                 <li key={key}>
-                  <NavRow item={it} active={active}>
+                  <NavRow item={it} active={active} onFilterClick={onFilterClick}>
                     {it.severityDot ? <Dot sev={it.severityDot} /> : null}
                     {!it.severityDot && it.sectionLevel != null ? (
                       <LevelDot level={it.sectionLevel} />
