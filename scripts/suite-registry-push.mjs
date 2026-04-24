@@ -138,10 +138,13 @@ function appendSidecarsFromDir(form, dir) {
   if (!dir || !existsSync(dir)) return;
   const rd = join(dir, "_run-detail-contract.json");
   const tr = join(dir, "_top-5-recommendations.json");
+  const fe = join(dir, "_findings-export.json");
   const a = loadOptionalJsonText(rd);
   const b = loadOptionalJsonText(tr);
+  const c = loadOptionalJsonText(fe);
   if (a) form.append("runDetailContract", a);
   if (b) form.append("topRecommendations", b);
+  if (c) form.append("findingsExport", c);
 }
 
 function fileField(absPath, filename) {

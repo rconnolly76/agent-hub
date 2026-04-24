@@ -12,6 +12,11 @@ export interface ParsedFinding {
   title: string;
   description: string;
   category: string;
+  /** Per-run id from skill (e.g. SEC-001); optional until findings export is used */
+  runFindingId?: string;
+  /** `health` | `strategy` — for project-level faceting */
+  facet?: string;
+  affectedFiles?: string[];
   recommendation: {
     /** Plain-language outcome for strategy roadmap / backlog (Hub Project Strategy UI). */
     userOutcome?: string;

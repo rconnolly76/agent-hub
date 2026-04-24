@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
-import { runs, metrics, findings } from "@/lib/db/schema";
-import { eq, sql, inArray } from "drizzle-orm";
+import { runs, metrics, findings, projectFindings, trendEvents } from "@/lib/db/schema";
+import { and, desc, eq, sql, inArray } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import type { Metadata } from "next";
@@ -180,6 +180,25 @@ export default async function ProjectDetailPage({
     orderBy: (r, { desc }) => [desc(r.createdAt)],
   });
 
+  const [rationalizedOpen, recentTrends] = await Promise.all([
+    db
+      .select()
+      .from(projectFindings)
+      .where(
+        and(
+          eq(projectFindings.projectId, id),
+          eq(projectFindings.status, "open")
+        )
+      )
+      .orderBy(desc(projectFindings.updatedAt)),
+    db
+      .select()
+      .from(trendEvents)
+      .where(eq(trendEvents.projectId, id))
+      .orderBy(desc(trendEvents.createdAt))
+      .limit(24),
+  ]);
+
   const runIds = projectRuns.map((r) => r.id);
 
   const [allMetrics, findingCounts] =
@@ -228,6 +247,7 @@ export default async function ProjectDetailPage({
   type SkillHealth = {
     type: string;
     label: string;
+    latestRunId: string;
     latestAt: Date;
     runs: number;
     findings: number;
@@ -256,6 +276,7 @@ export default async function ProjectDetailPage({
     return {
       type,
       label: formatSkillType(type),
+      latestRunId: latest.id,
       latestAt: latest.createdAt,
       runs: bucket.length,
       findings: findingsCount,
@@ -659,6 +680,169 @@ export default async function ProjectDetailPage({
           </div>
         </Card>
 
+        {/* Cross-run rationalized state (reconciled after each skill ingest) */}
+        {(rationalizedOpen.length > 0 || recentTrends.length > 0) && (
+          <div style={{ marginTop: 32 }}>
+            <SectionHeader
+              eyebrow="De-duplicated across runs · per skill"
+              title="Project state"
+              right={
+                <Link
+                  href={`/api/projects/${id}/state`}
+                  style={{
+                    fontSize: 11,
+                    color: "rgba(250,250,250,0.55)",
+                    textDecoration: "none",
+                  }}
+                >
+                  JSON
+                </Link>
+              }
+            />
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 16,
+                alignItems: "start",
+              }}
+            >
+              {rationalizedOpen.length > 0 && (
+                <Card>
+                  <div
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 600,
+                      letterSpacing: 0.7,
+                      textTransform: "uppercase",
+                      color: "rgba(250,250,250,0.45)",
+                      marginBottom: 10,
+                    }}
+                  >
+                    Open across facets
+                  </div>
+                  <div
+                    style={{ display: "flex", flexDirection: "column", gap: 8 }}
+                  >
+                    {rationalizedOpen.slice(0, 20).map((p) => (
+                      <div
+                        key={p.id}
+                        style={{
+                          fontSize: 12,
+                          padding: "8px 10px",
+                          borderRadius: 6,
+                          background: "rgba(255,255,255,0.03)",
+                          border: "1px solid rgba(255,255,255,0.06)",
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 6,
+                            flexWrap: "wrap",
+                            marginBottom: 3,
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontSize: 9,
+                              fontWeight: 700,
+                              textTransform: "uppercase",
+                              color:
+                                p.facet === "strategy" ? "#a78bfa" : "#10b981",
+                            }}
+                          >
+                            {p.facet}
+                          </span>
+                          <code
+                            style={{
+                              fontFamily: "ui-monospace, monospace",
+                              fontSize: 10,
+                              color: "rgba(250,250,250,0.45)",
+                            }}
+                          >
+                            {p.skillType}
+                          </code>
+                        </div>
+                        <div style={{ fontWeight: 500, lineHeight: 1.4 }}>
+                          {p.title}
+                        </div>
+                        {p.runFindingId && (
+                          <div
+                            style={{
+                              marginTop: 4,
+                              fontSize: 10,
+                              color: "rgba(250,250,250,0.4)",
+                            }}
+                          >
+                            {p.runFindingId} · {p.severity}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              )}
+              {recentTrends.length > 0 && (
+                <Card>
+                  <div
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 600,
+                      letterSpacing: 0.7,
+                      textTransform: "uppercase",
+                      color: "rgba(250,250,250,0.45)",
+                      marginBottom: 10,
+                    }}
+                  >
+                    Recent trends
+                  </div>
+                  <div
+                    style={{ display: "flex", flexDirection: "column", gap: 6 }}
+                  >
+                    {recentTrends.map((t) => (
+                      <div
+                        key={t.id}
+                        style={{
+                          fontSize: 12,
+                          display: "flex",
+                          justifyContent: "space-between",
+                          gap: 8,
+                          padding: "6px 8px",
+                          borderRadius: 6,
+                          background: "rgba(255,255,255,0.02)",
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontWeight: 600,
+                            color:
+                              t.type === "resolved"
+                                ? "#10b981"
+                                : t.type === "regressed"
+                                  ? "#ef4444"
+                                  : t.type === "improved"
+                                    ? "#22c55e"
+                                    : t.type === "new"
+                                      ? "#38bdf8"
+                                      : "rgba(250,250,250,0.85)",
+                          }}
+                        >
+                          {t.type}
+                        </span>
+                        <span style={{ color: "rgba(250,250,250,0.45)" }}>
+                          {t.skillType}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Roadmap kanban */}
         {allStrategyRows.length > 0 && (
           <div style={{ marginTop: 36 }}>
@@ -726,7 +910,11 @@ export default async function ProjectDetailPage({
                   <span style={{ textAlign: "right" }}>Runs</span>
                 </div>
                 {skills.map((s, i) => (
-                  <SkillRow key={s.type} s={s} last={i === skills.length - 1} />
+                  <SkillRow
+                    key={s.type}
+                    s={s}
+                    last={i === skills.length - 1}
+                  />
                 ))}
               </Card>
             </div>
@@ -1302,6 +1490,7 @@ function SkillRow({
   s: {
     type: string;
     label: string;
+    latestRunId: string;
     latestAt: Date;
     runs: number;
     findings: number;
@@ -1320,8 +1509,13 @@ function SkillRow({
         ? "#f59e0b"
         : "rgba(250,250,250,0.75)";
   return (
-    <div
+    <Link
+      href={`/runs/${s.latestRunId}`}
+      aria-label={`View latest run: ${s.label}`}
+      className="block cursor-pointer transition-colors hover:bg-white/[0.04] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-violet-500/50"
       style={{
+        textDecoration: "none",
+        color: "inherit",
         display: "grid",
         gridTemplateColumns: "1.4fr 84px 1fr 90px 60px",
         gap: 0,
@@ -1378,7 +1572,7 @@ function SkillRow({
       >
         {s.runs}
       </div>
-    </div>
+    </Link>
   );
 }
 
