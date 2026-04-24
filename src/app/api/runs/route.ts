@@ -34,6 +34,12 @@ import {
 } from "@/lib/suite-metadata";
 import { skillFamilyForSkillType } from "@/lib/skills/catalog";
 import { mergeFindingsWithTopRecommendations } from "@/lib/parsers/findings-from-top-recommendations";
+import {
+  defaultFacetForSkill,
+  mergeFindingsWithExport,
+  parseFindingsExportPayload,
+} from "@/lib/findings-export";
+import { reconcileAfterIngest } from "@/lib/reconcile";
 
 /** Ingest can upload many blobs; keep below your Vercel plan’s function max. */
 export const maxDuration = 300;
@@ -66,6 +72,21 @@ function parseOptionalRunDetailContract(input: FormDataEntryValue | null) {
     throw new Error("runDetailContract must match contract v1.0");
   }
   return parsed;
+}
+
+function parseOptionalFindingsExport(input: FormDataEntryValue | null) {
+  if (!input) return null;
+  if (typeof input !== "string") {
+    throw new Error("findingsExport must be sent as JSON string field");
+  }
+  if (!input.trim()) return null;
+  let raw: unknown;
+  try {
+    raw = JSON.parse(input);
+  } catch {
+    throw new Error("findingsExport must be valid JSON");
+  }
+  return parseFindingsExportPayload(raw);
 }
 
 function parseOptionalTopRecommendations(input: FormDataEntryValue | null) {
@@ -160,6 +181,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: message }, { status: 400 });
     }
 
+    let providedFindingsExport: ReturnType<typeof parseOptionalFindingsExport> = null;
+    try {
+      providedFindingsExport = parseOptionalFindingsExport(
+        formData.get("findingsExport")
+      );
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      return NextResponse.json({ error: message }, { status: 400 });
+    }
+
     const overrideRaw = formData.get("skillParserOverride");
     let override: ReturnType<typeof parseSkillParserOverride> | undefined;
     if (typeof overrideRaw === "string" && overrideRaw.trim()) {
@@ -189,6 +220,7 @@ export async function POST(req: NextRequest) {
         override,
         providedRunDetailContract,
         providedTopRecommendations,
+        providedFindingsExport,
         suiteFields,
       });
     }
@@ -201,6 +233,7 @@ export async function POST(req: NextRequest) {
       override,
       providedRunDetailContract,
       providedTopRecommendations,
+      providedFindingsExport,
       suiteFields,
     });
   } catch (e) {
@@ -241,6 +274,7 @@ async function ingestReportArtifact(opts: {
   override: ReturnType<typeof parseSkillParserOverride> | undefined;
   providedRunDetailContract: ReturnType<typeof parseOptionalRunDetailContract>;
   providedTopRecommendations: ReturnType<typeof parseOptionalTopRecommendations>;
+  providedFindingsExport: ReturnType<typeof parseOptionalFindingsExport>;
   suiteFields: ReturnType<typeof parseSuiteFieldsFromFormData>;
 }) {
   const {
@@ -251,6 +285,7 @@ async function ingestReportArtifact(opts: {
     override,
     providedRunDetailContract,
     providedTopRecommendations,
+    providedFindingsExport,
     suiteFields,
   } = opts;
 
@@ -277,9 +312,12 @@ async function ingestReportArtifact(opts: {
     auxiliaryConfigs,
   });
   const topRecommendations = providedTopRecommendations;
-  const findingsForRun = mergeFindingsWithTopRecommendations(
-    parsed.findings,
-    topRecommendations
+  const findingsForRun = mergeFindingsWithExport(
+    mergeFindingsWithTopRecommendations(
+      parsed.findings,
+      topRecommendations
+    ),
+    providedFindingsExport
   );
   const executiveSummary = topRecommendations
     ? ensureExecutiveSummaryWithNextSteps(parsed.executiveSummary, {
@@ -344,9 +382,20 @@ async function ingestReportArtifact(opts: {
         description: f.description,
         category: f.category,
         recommendation: f.recommendation,
+        runFindingId: f.runFindingId?.trim() || null,
+        facet: f.facet ?? defaultFacetForSkill(skillType),
+        extra: f.affectedFiles?.length
+          ? { affectedFiles: f.affectedFiles }
+          : null,
       }))
     );
   }
+
+  await reconcileAfterIngest({
+    projectId: project.id,
+    runId: run.id,
+    skillType,
+  });
 
   const uploadedScreenshots: string[] = [];
   const entries = Array.from(formData.entries());
@@ -440,6 +489,7 @@ async function ingestContentBundle(opts: {
   override: ReturnType<typeof parseSkillParserOverride> | undefined;
   providedRunDetailContract: ReturnType<typeof parseOptionalRunDetailContract>;
   providedTopRecommendations: ReturnType<typeof parseOptionalTopRecommendations>;
+  providedFindingsExport: ReturnType<typeof parseOptionalFindingsExport>;
   suiteFields: ReturnType<typeof parseSuiteFieldsFromFormData>;
 }) {
   const {
@@ -450,6 +500,7 @@ async function ingestContentBundle(opts: {
     override,
     providedRunDetailContract,
     providedTopRecommendations,
+    providedFindingsExport,
     suiteFields,
   } = opts;
 
@@ -494,9 +545,12 @@ async function ingestContentBundle(opts: {
     auditMarkdown?.trim() ? auditMarkdown : buildSyntheticBundleReport(manifest);
   const reportName = auditMarkdown?.trim() ? auditFilename : "bundle-overview.md";
   const topRecommendations = providedTopRecommendations;
-  const findingsForBundle = mergeFindingsWithTopRecommendations(
-    parsed.findings,
-    topRecommendations
+  const findingsForBundle = mergeFindingsWithExport(
+    mergeFindingsWithTopRecommendations(
+      parsed.findings,
+      topRecommendations
+    ),
+    providedFindingsExport
   );
   const executiveSummary = topRecommendations
     ? ensureExecutiveSummaryWithNextSteps(parsed.executiveSummary, {
@@ -647,9 +701,20 @@ async function ingestContentBundle(opts: {
         description: f.description,
         category: f.category,
         recommendation: f.recommendation,
+        runFindingId: f.runFindingId?.trim() || null,
+        facet: f.facet ?? defaultFacetForSkill(effectiveSkillType),
+        extra: f.affectedFiles?.length
+          ? { affectedFiles: f.affectedFiles }
+          : null,
       }))
     );
   }
+
+  await reconcileAfterIngest({
+    projectId: project.id,
+    runId: run.id,
+    skillType: effectiveSkillType,
+  });
 
   return NextResponse.json(
     {

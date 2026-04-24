@@ -1,4 +1,13 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+This is a [Next.js](https://nextjs.org) project with PostgreSQL (Neon) via Drizzle.
+
+After pulling changes that update `src/lib/db/schema.ts`, apply the diff to your database:
+
+```bash
+# DATABASE_URL in .env.local
+npm run db:push
+```
+
+`npm run build:vercel` runs `drizzle-kit push` before `next build` so new columns exist when `DATABASE_URL` is set (e.g. on Vercel).
 
 ## Getting Started
 

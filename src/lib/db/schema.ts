@@ -65,6 +65,66 @@ export const findings = pgTable("findings", {
   category: text("category"),
   recommendation: jsonb("recommendation"),
   status: text("status").notNull().default("open"),
+  /** e.g. SEC-001 from skill report — powers cross-run project reconciliation */
+  runFindingId: text("run_finding_id"),
+  /** health = code/ux audits; strategy = GTM, research, roadmap, backlog */
+  facet: text("facet"),
+  extra: jsonb("extra").$type<{ affectedFiles?: string[] } | null>(),
+});
+
+/**
+ * Deduplicated logical issue per project (reconciled across runs; deterministic, no LLM in v1).
+ */
+export const projectFindings = pgTable(
+  "project_findings",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    /** `${skillType}::${runFindingId || normalizeTitle}` */
+    dedupeKey: text("dedupe_key").notNull(),
+    skillType: text("skill_type").notNull(),
+    facet: text("facet").notNull().default("health"),
+    runFindingId: text("run_finding_id"),
+    title: text("title").notNull(),
+    severity: text("severity").notNull(),
+    status: text("status").notNull().default("open"),
+    firstRunId: uuid("first_run_id").references(() => runs.id, { onDelete: "set null" }),
+    lastRunId: uuid("last_run_id")
+      .notNull()
+      .references(() => runs.id, { onDelete: "cascade" }),
+    lastHubFindingId: uuid("last_hub_finding_id").references(() => findings.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => ({
+    projectDedupe: uniqueIndex("project_findings_project_dedupe").on(
+      t.projectId,
+      t.dedupeKey
+    ),
+  })
+);
+
+/** Stored when project reconciliation compares this run to prior state */
+export const trendEvents = pgTable("trend_events", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  projectId: uuid("project_id")
+    .notNull()
+    .references(() => projects.id, { onDelete: "cascade" }),
+  projectFindingId: uuid("project_finding_id").references(() => projectFindings.id, {
+    onDelete: "cascade",
+  }),
+  type: text("type").notNull(),
+  skillType: text("skill_type").notNull(),
+  fromRunId: uuid("from_run_id").references(() => runs.id, { onDelete: "set null" }),
+  toRunId: uuid("to_run_id")
+    .notNull()
+    .references(() => runs.id, { onDelete: "cascade" }),
+  detail: jsonb("detail").$type<Record<string, unknown> | null>(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
 /** Full markdown text for content-bundle files (query/search); blobs remain canonical for assets. */
@@ -105,6 +165,8 @@ export const contentDocuments = pgTable(
 export const projectsRelations = relations(projects, ({ many }) => ({
   runs: many(runs),
   contentDocuments: many(contentDocuments),
+  projectFindings: many(projectFindings),
+  trendEvents: many(trendEvents),
 }));
 
 export const runsRelations = relations(runs, ({ one, many }) => ({
@@ -151,5 +213,44 @@ export const contentDocumentsRelations = relations(contentDocuments, ({ one }) =
   artifact: one(artifacts, {
     fields: [contentDocuments.artifactId],
     references: [artifacts.id],
+  }),
+}));
+
+export const projectFindingsRelations = relations(projectFindings, ({ one, many }) => ({
+  project: one(projects, {
+    fields: [projectFindings.projectId],
+    references: [projects.id],
+  }),
+  firstRun: one(runs, {
+    fields: [projectFindings.firstRunId],
+    references: [runs.id],
+  }),
+  lastRun: one(runs, {
+    fields: [projectFindings.lastRunId],
+    references: [runs.id],
+  }),
+  lastHubFinding: one(findings, {
+    fields: [projectFindings.lastHubFindingId],
+    references: [findings.id],
+  }),
+  trends: many(trendEvents),
+}));
+
+export const trendEventsRelations = relations(trendEvents, ({ one }) => ({
+  project: one(projects, {
+    fields: [trendEvents.projectId],
+    references: [projects.id],
+  }),
+  projectFinding: one(projectFindings, {
+    fields: [trendEvents.projectFindingId],
+    references: [projectFindings.id],
+  }),
+  fromRun: one(runs, {
+    fields: [trendEvents.fromRunId],
+    references: [runs.id],
+  }),
+  toRun: one(runs, {
+    fields: [trendEvents.toRunId],
+    references: [runs.id],
   }),
 }));

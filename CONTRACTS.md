@@ -43,12 +43,13 @@ The request body is a `FormData` object. Field keys are defined below — they f
 | `journeyMap` | File (markdown) | no | report (reviewer) | Optional ux-journeys.md companion. |
 | `runDetailContract` | **JSON string (text)** | no | both | Contents of `_run-detail-contract.json`. See [run-detail-contract.md](run-detail-contract.md). |
 | `topRecommendations` | **JSON string (text)** | no | both | Contents of `_top-5-recommendations.json`. See [top-recommendations-contract.md](top-recommendations-contract.md). |
+| `findingsExport` | **JSON string (text)** | no | both | Optional machine-stable `findings[]` for cross-run reconciliation and faceting. See [findings-export.md](findings-export.md). Push script: `_findings-export.json` beside the other sidecars. |
 | `skillParserOverride` | JSON string (text) | no | both | `{ parserId, executiveSummaryFallbackMaxChars? }` — force a specific parser for this run. |
 | `apiKey` | string | — | both | Header `x-api-key` preferred; the field form is a fallback. |
 
 ### Important
 
-- `runDetailContract` and `topRecommendations` are **text fields containing JSON** — not file blobs. The push script reads the sidecar file and appends its text content to the form. The server parses the string with `JSON.parse` before validating.
+- `runDetailContract`, `topRecommendations`, and `findingsExport` are **text fields containing JSON** — not file blobs. The push script reads the sidecar file and appends its text content to the form. The server parses the string with `JSON.parse` before validating.
 - `content:<rel-path>` keys preserve nested paths (`features/dark-mode.md`). The server reconstructs the directory structure from the key.
 - Files use `File` (not `Blob`) in Node fetch when content is UTF-8 text — smart quotes, emoji, CJK can otherwise fail multipart serialization.
 
