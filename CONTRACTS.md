@@ -23,6 +23,22 @@ Header: x-api-key: <project api key>
 Content-Type: multipart/form-data
 ```
 
+## Read / export (inverse of ingest)
+
+Use the same `x-api-key` as for POST. These powers **pulling** the latest (or a specific) run into a local workspace without opening the Hub UI.
+
+| Method | URL | Returns |
+|--------|-----|--------|
+| `GET` | `/api/runs?skillType=<optional>&limit=1-100` (default 30) | Project id/name plus a list of recent runs: id, `skillType`, `createdAt`, `executiveSummaryPreview`, and `hubPath` (`/runs/…`) |
+| `GET` | `/api/runs/{runId}/export` | Full run object, `reportMarkdown` (fetched from blob), `findings[]`, `metrics[]`, `configs` (config-role JSON by filename, e.g. `opportunities.json`), and artifact metadata + blob URLs |
+| `GET` | `/api/product-opportunities?runId=<optional>` | **Latest** `product-opportunity-analysis` run for the project, or a **pinned** `runId` of that `skillType`. Same JSON as `/export` plus `opportunities` (convenience alias for `configs['opportunities.json']`) and `hubPath`. |
+
+`GET /api/projects/{id}/state` remains a separate, **public** endpoint for open project-finding / trend data — it does not replace a strategy report export; use `…/export` for raw markdown and attached JSON.
+
+Agents **read** these surfaces via the `agent-hub-lookup` skill (`~/.claude/skills/agent-hub-lookup/`) in the same skill family as `agent-hub-push` (ingest).
+
+### Ingest: request body (POST /api/runs)
+
 The request body is a `FormData` object. Field keys are defined below — they fall into two categories:
 
 - **Fixed keys** — exact field names the server reads by name.
