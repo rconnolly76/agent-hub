@@ -81,7 +81,11 @@ export function ProjectHorizonsBoard({
   byHorizon: Record<HorizonKey, StrategyRoadmapRow[]>;
   allRows: StrategyRoadmapRow[];
 }) {
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(() => {
+    const fromHash = parseFindingHash();
+    if (!fromHash) return null;
+    return allRows.some((r) => r.findingId === fromHash) ? fromHash : null;
+  });
 
   const byId = useMemo(() => {
     const m = new Map<string, StrategyRoadmapRow>();
@@ -93,11 +97,6 @@ export function ProjectHorizonsBoard({
     () => allRows.map((r) => r.inspector),
     [allRows]
   );
-
-  useEffect(() => {
-    const fromHash = parseFindingHash();
-    if (fromHash && byId.has(fromHash)) setSelectedId(fromHash);
-  }, [byId]);
 
   useEffect(() => {
     const onHash = () => {

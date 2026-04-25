@@ -2,6 +2,11 @@ import { extractExecutiveSummarySection } from "./executive-summary";
 import { buildRunDetailContractFromReport } from "@/lib/run-detail-contract";
 import type { ParseResult, ParsedFinding, ParsedMetric } from "./ux-journey-reviewer";
 
+type StrategyRec = ParsedFinding["recommendation"] & {
+  linked?: string[];
+  linkedBacklog?: string[];
+};
+
 /** Data row: | 1 | OP-007 | Title | ... | */
 function parseHorizonTableRows(
   body: string,
@@ -63,6 +68,78 @@ function parseHorizonTableRows(
   return findings;
 }
 
+function extractLinkedCodes(block: string, selfCode: string): string[] {
+  const hits = [...block.matchAll(/\b(?:OP|BL)-\d+\b/gi)].map((m) =>
+    m[0].toUpperCase()
+  );
+  const uniq: string[] = [];
+  const seen = new Set<string>();
+  for (const h of hits) {
+    if (h === selfCode) continue;
+    if (seen.has(h)) continue;
+    seen.add(h);
+    uniq.push(h);
+  }
+  return uniq;
+}
+
+function parseTitleParts(title: string): { code: string; headline: string } {
+  const m = title.match(/^(OP-\d+)\s*[—\-–]\s*(.+)$/i);
+  if (m) return { code: m[1].toUpperCase(), headline: m[2].trim() };
+  return { code: "", headline: title.trim() };
+}
+
+function buildStrategyNarrative(args: {
+  sourceLabel: "Roadmap" | "Backlog";
+  itemCode?: string;
+  what: string;
+  why?: string;
+  linked?: string[];
+  resolveLinkedLabel?: (code: string) => string | null;
+  provenance?: string;
+  evidence?: string;
+}): string {
+  const lines: string[] = [];
+  lines.push("### What we’re doing", args.what || "—");
+
+  const why = args.why?.trim();
+  if (why) lines.push("", "### Why this matters", why);
+
+  lines.push(
+    "",
+    "### How we’ll execute",
+    `This ${args.sourceLabel.toLowerCase()} item comes from an automated strategy run. We’ll use it to align on the intended outcome, sequence the work into shippable steps, and re-run the suite to confirm the change improves the signals that motivated it.`
+  );
+
+  const linked = args.linked ?? [];
+  if (linked.length > 0) {
+    const resolved = linked
+      .map((code) => {
+        const label = args.resolveLinkedLabel?.(code);
+        return label ? `- ${code}: ${label}` : `- ${code}`;
+      })
+      .join("\n");
+    lines.push(
+      "",
+      "### Related items (sequence / dependencies)",
+      "These are referenced because they should be delivered together, in order, or they materially constrain the approach:",
+      resolved
+    );
+  }
+
+  const provenanceBits = [args.sourceLabel, args.itemCode, args.provenance]
+    .filter(Boolean)
+    .join(" · ");
+  if (provenanceBits) {
+    lines.push("", "### Provenance", provenanceBits);
+  }
+
+  const evidence = args.evidence?.trim();
+  if (evidence) lines.push("", "### Evidence from the run", evidence);
+
+  return lines.join("\n");
+}
+
 /** `#### OP-007 — Title` narrative blocks under ### Now / Next / Later */
 function extractOpportunityNarrativeBlocks(md: string): ParsedFinding[] {
   const findings: ParsedFinding[] = [];
@@ -119,6 +196,7 @@ function extractOpportunityNarrativeBlocks(md: string): ParsedFinding[] {
 
     const userOutcome = plain || shortTitle;
     const whyText = whyNow || gate || evidence || "";
+    const linked = extractLinkedCodes(block, oppId);
 
     findings.push({
       severity: "info",
@@ -129,6 +207,7 @@ function extractOpportunityNarrativeBlocks(md: string): ParsedFinding[] {
         userOutcome: userOutcome || undefined,
         what: userOutcome || shortTitle,
         why: whyText || undefined,
+        ...(linked.length > 0 ? { linked } : {}),
       },
     });
   }
@@ -298,7 +377,41 @@ export function parseFeatureRoadmapReport(
   for (const f of [...mergedJson, ...gatedFindings]) {
     byTitle.set(f.title, f);
   }
-  const findings = [...byTitle.values()];
+  const baseFindings = [...byTitle.values()];
+
+  const byCode = new Map<string, string>();
+  for (const f of baseFindings) {
+    const { code, headline } = parseTitleParts(f.title);
+    const rec: StrategyRec = (f.recommendation ?? {}) as StrategyRec;
+    const label = (rec.userOutcome || rec.what || headline || f.title).trim();
+    if (code) byCode.set(code, label);
+  }
+
+  const findings = baseFindings.map((f) => {
+    const { code, headline } = parseTitleParts(f.title);
+    const rec: StrategyRec = (f.recommendation ?? {}) as StrategyRec;
+    const what = (rec.userOutcome || rec.what || headline || f.title).trim();
+    const why = typeof rec.why === "string" ? rec.why : undefined;
+    const linked: string[] = Array.isArray(rec.linked) ? rec.linked : [];
+
+    return {
+      ...f,
+      recommendation: {
+        ...rec,
+        ...(linked.length > 0 ? { linked } : {}),
+      },
+      description: buildStrategyNarrative({
+        sourceLabel: "Roadmap",
+        itemCode: code || undefined,
+        what,
+        why,
+        linked,
+        resolveLinkedLabel: (c) => byCode.get(c) ?? null,
+        provenance: f.category,
+        evidence: f.description,
+      }),
+    };
+  });
 
   const metrics = extractRoadmapMetrics(findings);
 

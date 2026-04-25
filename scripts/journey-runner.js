@@ -11,35 +11,37 @@
  * performance metrics, and DOM assertions at every step.
  */
 
-const { chromium } = require('playwright');
-const { AxeBuilder } = require('@axe-core/playwright');
-const fs = require('fs');
-const path = require('path');
-
-// ── Parse CLI args ──────────────────────────────────────────────────────────
-
-const args = process.argv.slice(2);
-const configPath = args.includes('--config')
-  ? args[args.indexOf('--config') + 1]
-  : null;
-
-let journey;
-if (configPath) {
-  journey = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-} else {
-  console.error('Usage: node journey-runner.js --config journey-config.json');
-  process.exit(1);
-}
-
-// ── Output dirs ─────────────────────────────────────────────────────────────
-
-const SCREENSHOT_DIR = path.resolve('./ux-journey-screenshots');
-const RESULTS_PATH = path.resolve('./ux-journey-results.json');
-fs.mkdirSync(SCREENSHOT_DIR, { recursive: true });
-
 // ── Main runner ─────────────────────────────────────────────────────────────
 
 (async () => {
+  const [{ chromium }, { AxeBuilder }, fs, path] = await Promise.all([
+    import('playwright'),
+    import('@axe-core/playwright'),
+    import('node:fs'),
+    import('node:path'),
+  ]);
+
+  // ── Parse CLI args ────────────────────────────────────────────────────────
+
+  const args = process.argv.slice(2);
+  const configPath = args.includes('--config')
+    ? args[args.indexOf('--config') + 1]
+    : null;
+
+  let journey;
+  if (configPath) {
+    journey = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+  } else {
+    console.error('Usage: node journey-runner.js --config journey-config.json');
+    process.exit(1);
+  }
+
+  // ── Output dirs ───────────────────────────────────────────────────────────
+
+  const SCREENSHOT_DIR = path.resolve('./ux-journey-screenshots');
+  const RESULTS_PATH = path.resolve('./ux-journey-results.json');
+  fs.mkdirSync(SCREENSHOT_DIR, { recursive: true });
+
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({
     viewport: journey.viewport || { width: 1440, height: 900 },
@@ -113,7 +115,7 @@ fs.mkdirSync(SCREENSHOT_DIR, { recursive: true });
           const entries = list.getEntries();
           window.__uxMetrics.lcp = entries[entries.length - 1]?.startTime || null;
         }).observe({ type: 'largest-contentful-paint', buffered: true });
-      } catch (e) {}
+      } catch {}
 
       // CLS
       try {
@@ -124,7 +126,7 @@ fs.mkdirSync(SCREENSHOT_DIR, { recursive: true });
             }
           }
         }).observe({ type: 'layout-shift', buffered: true });
-      } catch (e) {}
+      } catch {}
 
       // FID
       try {
@@ -134,7 +136,7 @@ fs.mkdirSync(SCREENSHOT_DIR, { recursive: true });
             window.__uxMetrics.fid = entries[0].processingStart - entries[0].startTime;
           }
         }).observe({ type: 'first-input', buffered: true });
-      } catch (e) {}
+      } catch {}
 
       // TTFB
       try {
@@ -142,7 +144,7 @@ fs.mkdirSync(SCREENSHOT_DIR, { recursive: true });
         if (navEntry) {
           window.__uxMetrics.ttfb = navEntry.responseStart - navEntry.requestStart;
         }
-      } catch (e) {}
+      } catch {}
     });
   }
 
