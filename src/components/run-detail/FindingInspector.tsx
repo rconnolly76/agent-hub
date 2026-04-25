@@ -7,6 +7,7 @@ import { SeverityPill } from "./SeverityPill";
 import { severityMonoClass } from "./run-detail-tokens";
 import { useCommandCenterOptional } from "./command-center-context";
 import { FindingRecommendationView } from "./finding-recommendation-view";
+import { InspectorMarkdown } from "./InspectorMarkdown";
 import { LinearGlyph } from "./LinearGlyph";
 import type { FindingInspectorData } from "@/lib/finding-inspector-data";
 
@@ -170,9 +171,7 @@ export function FindingInspector({
 
       {f.description && (
         <Block title="Description">
-          <p className="m-0 text-[12.5px] leading-[1.6] text-zinc-200/80 whitespace-pre-wrap">
-            {f.description}
-          </p>
+          <InspectorMarkdown content={f.description} />
         </Block>
       )}
 

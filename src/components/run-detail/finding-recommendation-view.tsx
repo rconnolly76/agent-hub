@@ -1,5 +1,6 @@
 import { type ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { InspectorMarkdown } from "./InspectorMarkdown";
 
 const KNOWN: { key: string; label: string }[] = [
   { key: "userOutcome", label: "User outcome" },
@@ -26,8 +27,10 @@ function labelize(key: string): string {
 
 function formatValue(v: unknown, depth: number): ReactNode {
   if (v == null) return "—";
-  if (typeof v === "string" || typeof v === "number" || typeof v === "boolean")
-    return String(v);
+  if (typeof v === "string") {
+    return <InspectorMarkdown content={v} />;
+  }
+  if (typeof v === "number" || typeof v === "boolean") return String(v);
   if (Array.isArray(v)) {
     if (v.length === 0) return "—";
     if (depth > 2)
@@ -97,9 +100,13 @@ export function FindingRecommendationView({
         <p className="text-[10px] font-medium tracking-[0.05em] uppercase text-zinc-500/90 mb-1.5">
           Recommendation
         </p>
-        <p className="m-0 text-sm leading-relaxed text-zinc-300/90">
-          {String(recommendation)}
-        </p>
+        {typeof recommendation === "string" ? (
+          <InspectorMarkdown content={recommendation} />
+        ) : (
+          <p className="m-0 text-sm leading-relaxed text-zinc-300/90">
+            {String(recommendation)}
+          </p>
+        )}
       </div>
     );
   }
