@@ -1287,7 +1287,7 @@ function HorizonColumn({
 function RoadmapCard({ row }: { row: StrategyRoadmapRow }) {
   return (
     <Link
-      href={`/runs/${row.runId}`}
+      href={`/runs/${row.runId}#finding-${row.findingId}`}
       style={{ textDecoration: "none", color: "inherit" }}
     >
       <div
