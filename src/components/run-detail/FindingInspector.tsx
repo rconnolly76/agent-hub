@@ -8,19 +8,18 @@ import { severityMonoClass } from "./run-detail-tokens";
 import { useCommandCenterOptional } from "./command-center-context";
 import { FindingRecommendationView } from "./finding-recommendation-view";
 import { LinearGlyph } from "./LinearGlyph";
+import type { FindingInspectorData } from "@/lib/finding-inspector-data";
 
-export interface FindingInspectorData {
-  id: string;
-  severity: string;
-  title: string;
-  description: string | null;
-  category: string | null;
-  status: string;
-  recommendation: unknown;
-}
+export type { FindingInspectorData } from "@/lib/finding-inspector-data";
 
 interface FindingInspectorProps {
   findings: FindingInspectorData[];
+  /**
+   * When set, selection is fully controlled (e.g. project horizon board without Command Center).
+   * Omitted: existing behavior (Command Center + hash, else first finding).
+   */
+  selectedFindingId?: string | null;
+  noSelectionMessage?: string;
 }
 
 function Block({ title, children }: { title: string; children: ReactNode }) {
@@ -60,18 +59,38 @@ function MetaBlock({
   );
 }
 
-export function FindingInspector({ findings }: FindingInspectorProps) {
+export function FindingInspector({
+  findings,
+  selectedFindingId,
+  noSelectionMessage,
+}: FindingInspectorProps) {
   const cc = useCommandCenterOptional();
-  const selectedId = cc?.selectedId ?? null;
+  const controlled = selectedFindingId !== undefined;
+  const fromContext = cc?.selectedId ?? null;
+  const rawSelected = controlled ? selectedFindingId : fromContext;
 
-  const f =
-    findings.find((x) => x.id === selectedId) ??
-    (findings.length > 0 ? findings[0] : null);
+  const f = rawSelected
+    ? (findings.find((x) => x.id === rawSelected) ?? null)
+    : controlled
+      ? null
+      : findings.length > 0
+        ? (findings[0] ?? null)
+        : null;
 
   if (!f) {
+    let message = "No findings for this run.";
+    if (controlled) {
+      if (rawSelected == null) {
+        message =
+          noSelectionMessage ??
+          "Select an item to view the full finding detail.";
+      } else {
+        message = "This finding is not available.";
+      }
+    }
     return (
       <div className="rounded-lg border border-dashed border-white/[0.1] px-4 py-8 text-center text-sm text-zinc-500">
-        No findings for this run.
+        {message}
       </div>
     );
   }

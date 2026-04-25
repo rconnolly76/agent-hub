@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { findings, runs } from "@/lib/db/schema";
+import type { FindingInspectorData } from "@/lib/finding-inspector-data";
 import { and, desc, eq, inArray } from "drizzle-orm";
 
 export type StrategyRoadmapRow = {
@@ -18,6 +19,8 @@ export type StrategyRoadmapRow = {
   score: number | null;
   effort: string | null;
   linked: string[];
+  /** Full finding record for the project horizon inspector / run deep-link parity. */
+  inspector: FindingInspectorData;
 };
 
 type Rec = {
@@ -77,6 +80,8 @@ function buildRow(
     description: string | null;
     category: string | null;
     recommendation: unknown;
+    severity: string;
+    status: string;
   },
   skillType: "feature-roadmap" | "product-backlog"
 ): StrategyRoadmapRow {
@@ -145,6 +150,15 @@ function buildRow(
     score,
     effort,
     linked,
+    inspector: {
+      id: f.id,
+      severity: f.severity,
+      title: f.title,
+      description: f.description,
+      category: f.category,
+      status: f.status,
+      recommendation: f.recommendation,
+    },
   };
 }
 

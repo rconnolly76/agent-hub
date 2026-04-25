@@ -13,6 +13,7 @@ import {
   getProjectStrategyRoadmap,
   type StrategyRoadmapRow,
 } from "@/lib/project-strategy-roadmap";
+import { ProjectHorizonsBoard } from "@/components/project-detail/ProjectHorizonsBoard";
 
 export const dynamic = "force-dynamic";
 
@@ -38,36 +39,6 @@ const SEV = {
   passing: { fg: "#10b981", dot: "#10b981" },
 };
 
-const HORIZON: Record<
-  string,
-  { fg: string; bg: string; border: string; dot: string }
-> = {
-  Now: {
-    fg: "#10b981",
-    bg: "rgba(16,185,129,0.10)",
-    border: "rgba(16,185,129,0.30)",
-    dot: "#10b981",
-  },
-  Next: {
-    fg: "#60a5fa",
-    bg: "rgba(96,165,250,0.10)",
-    border: "rgba(96,165,250,0.30)",
-    dot: "#60a5fa",
-  },
-  Later: {
-    fg: "#a1a1aa",
-    bg: "rgba(161,161,170,0.10)",
-    border: "rgba(161,161,170,0.24)",
-    dot: "#a1a1aa",
-  },
-  Gated: {
-    fg: "#f59e0b",
-    bg: "rgba(245,158,11,0.10)",
-    border: "rgba(245,158,11,0.30)",
-    dot: "#f59e0b",
-  },
-};
-
 const STATE_STYLE = {
   "on-track": {
     fg: "#10b981",
@@ -90,8 +61,6 @@ const STATE_STYLE = {
 } as const;
 
 type StateKey = keyof typeof STATE_STYLE;
-
-const ACCENT = "#8b5cf6";
 
 // ── Helpers ─────────────────────────────────────────────────────────────
 
@@ -852,17 +821,10 @@ export default async function ProjectDetailPage({
               } run`}
               title="Horizons"
             />
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(4, 1fr)",
-                gap: 12,
-              }}
-            >
-              {horizons.map((h) => (
-                <HorizonColumn key={h} horizon={h} items={byHorizon[h]} />
-              ))}
-            </div>
+            <ProjectHorizonsBoard
+              byHorizon={byHorizon}
+              allRows={allStrategyRows}
+            />
           </div>
         )}
 
@@ -1206,247 +1168,6 @@ function StackedBar({
         />
       ))}
     </div>
-  );
-}
-
-function HorizonColumn({
-  horizon,
-  items,
-}: {
-  horizon: keyof typeof HORIZON;
-  items: StrategyRoadmapRow[];
-}) {
-  const c = HORIZON[horizon];
-  return (
-    <div>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "0 2px 10px",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span
-            style={{
-              width: 7,
-              height: 7,
-              borderRadius: 99,
-              background: c.dot,
-              boxShadow: `0 0 8px ${c.dot}66`,
-            }}
-          />
-          <span
-            style={{ fontSize: 13, fontWeight: 600, letterSpacing: -0.1 }}
-          >
-            {horizon}
-          </span>
-          <span
-            style={{
-              fontSize: 11,
-              color: "rgba(250,250,250,0.45)",
-              fontVariantNumeric: "tabular-nums",
-            }}
-          >
-            {items.length}
-          </span>
-        </div>
-      </div>
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: 8,
-          background: "rgba(255,255,255,0.015)",
-          border: "1px solid rgba(255,255,255,0.05)",
-          borderRadius: 10,
-          padding: 8,
-          minHeight: 300,
-        }}
-      >
-        {items.length === 0 ? (
-          <div
-            style={{
-              fontSize: 11,
-              color: "rgba(250,250,250,0.35)",
-              textAlign: "center",
-              padding: "16px 8px",
-            }}
-          >
-            No items
-          </div>
-        ) : (
-          items.map((r) => <RoadmapCard key={r.findingId} row={r} />)
-        )}
-      </div>
-    </div>
-  );
-}
-
-function RoadmapCard({ row }: { row: StrategyRoadmapRow }) {
-  return (
-    <Link
-      href={`/runs/${row.runId}#finding-${row.findingId}`}
-      style={{ textDecoration: "none", color: "inherit" }}
-    >
-      <div
-        style={{
-          background: "rgba(255,255,255,0.025)",
-          border: "1px solid rgba(255,255,255,0.07)",
-          borderRadius: 8,
-          padding: "12px 13px",
-          display: "flex",
-          flexDirection: "column",
-          gap: 8,
-          position: "relative",
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            flexWrap: "wrap",
-          }}
-        >
-          {row.itemCode && (
-            <code
-              style={{
-                fontFamily: "ui-monospace, monospace",
-                fontSize: 10,
-                color: ACCENT,
-                fontWeight: 600,
-                letterSpacing: 0.3,
-              }}
-            >
-              {row.itemCode}
-            </code>
-          )}
-          {row.itemCode && (
-            <span style={{ fontSize: 10, color: "rgba(250,250,250,0.4)" }}>
-              ·
-            </span>
-          )}
-          <span style={{ fontSize: 10, color: "rgba(250,250,250,0.55)" }}>
-            {row.skillLabel}
-          </span>
-          <span
-            style={{ marginLeft: "auto", display: "flex", gap: 5 }}
-          >
-            {row.score != null && <ScorePill n={row.score} />}
-            {row.effort && <EffortChip e={row.effort} />}
-          </span>
-        </div>
-        <div
-          style={{
-            fontSize: 13.5,
-            fontWeight: 600,
-            letterSpacing: -0.1,
-            lineHeight: 1.3,
-          }}
-        >
-          {row.what}
-        </div>
-        {row.why && row.why !== "—" && (
-          <div
-            style={{
-              fontSize: 12,
-              color: "rgba(250,250,250,0.62)",
-              lineHeight: 1.5,
-            }}
-          >
-            {row.why}
-          </div>
-        )}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            marginTop: 2,
-            fontSize: 11,
-            color: "rgba(250,250,250,0.55)",
-            flexWrap: "wrap",
-          }}
-        >
-          {row.who && row.who !== "—" && (
-            <span
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 4,
-              }}
-            >
-              {row.who}
-            </span>
-          )}
-          {row.linked.length > 0 && (
-            <>
-              {row.who && row.who !== "—" && (
-                <span style={{ opacity: 0.3 }}>·</span>
-              )}
-              <span style={{ display: "inline-flex", gap: 4, flexWrap: "wrap" }}>
-                {row.linked.map((l) => (
-                  <code
-                    key={l}
-                    style={{
-                      fontFamily: "ui-monospace, monospace",
-                      fontSize: 10,
-                      padding: "1px 5px",
-                      borderRadius: 3,
-                      background: "rgba(255,255,255,0.05)",
-                      color: "rgba(250,250,250,0.7)",
-                    }}
-                  >
-                    {l}
-                  </code>
-                ))}
-              </span>
-            </>
-          )}
-        </div>
-      </div>
-    </Link>
-  );
-}
-
-function ScorePill({ n }: { n: number }) {
-  const hue = n >= 4.2 ? "#10b981" : n >= 3.6 ? "#f59e0b" : "#a1a1aa";
-  return (
-    <span
-      style={{
-        fontSize: 11,
-        fontWeight: 600,
-        fontVariantNumeric: "tabular-nums",
-        color: hue,
-        background: `${hue}18`,
-        border: `1px solid ${hue}44`,
-        padding: "1px 6px",
-        borderRadius: 4,
-      }}
-    >
-      {n.toFixed(1)}
-    </span>
-  );
-}
-
-function EffortChip({ e }: { e: string }) {
-  return (
-    <span
-      style={{
-        fontSize: 10,
-        fontWeight: 600,
-        letterSpacing: 0.4,
-        color: "rgba(250,250,250,0.7)",
-        background: "rgba(255,255,255,0.05)",
-        border: "1px solid rgba(255,255,255,0.08)",
-        padding: "1px 6px",
-        borderRadius: 4,
-      }}
-    >
-      {e}
-    </span>
   );
 }
 
