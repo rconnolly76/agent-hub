@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ExternalLink } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { FindingInspector } from "@/components/run-detail/FindingInspector";
+import { InspectorMarkdown } from "@/components/run-detail/InspectorMarkdown";
 import type { StrategyRoadmapRow } from "@/lib/project-strategy-roadmap";
 import { cn } from "@/lib/utils";
 
@@ -367,7 +368,10 @@ function HorizonColumn({
                     color: "#fafafa",
                   }}
                 >
-                  {r.what}
+                  <InspectorMarkdown
+                    content={r.what}
+                    className="[&_p]:text-[13.5px] [&_p]:leading-[1.3] [&_h1]:text-[13.5px] [&_h2]:text-[13.5px] [&_h3]:text-[13.5px] [&_h4]:text-[13.5px] [&_h1]:leading-[1.3] [&_h2]:leading-[1.3] [&_h3]:leading-[1.3] [&_h4]:leading-[1.3] [&_h1]:font-semibold [&_h2]:font-semibold [&_h3]:font-semibold [&_h4]:font-semibold [&_p]:m-0 [&_h1]:m-0 [&_h2]:m-0 [&_h3]:m-0 [&_h4]:m-0"
+                  />
                 </div>
                 {r.why && r.why !== "—" && (
                   <div
@@ -377,7 +381,10 @@ function HorizonColumn({
                       lineHeight: 1.5,
                     }}
                   >
-                    {r.why}
+                    <InspectorMarkdown
+                      content={r.why}
+                      className="[&_p]:text-[12px] [&_p]:leading-[1.5] [&_p]:text-[rgba(250,250,250,0.62)] [&_h1]:text-[12px] [&_h2]:text-[12px] [&_h3]:text-[12px] [&_h4]:text-[12px] [&_h1]:text-[rgba(250,250,250,0.7)] [&_h2]:text-[rgba(250,250,250,0.7)] [&_h3]:text-[rgba(250,250,250,0.7)] [&_h4]:text-[rgba(250,250,250,0.7)]"
+                    />
                   </div>
                 )}
                 <div
@@ -399,7 +406,10 @@ function HorizonColumn({
                         gap: 4,
                       }}
                     >
-                      {r.who}
+                      <InspectorMarkdown
+                        content={r.who}
+                        className="[&_p]:m-0 [&_p]:text-[11px] [&_p]:leading-[1.4] [&_p]:text-[rgba(250,250,250,0.55)] [&_h1]:m-0 [&_h2]:m-0 [&_h3]:m-0 [&_h4]:m-0 [&_h1]:text-[11px] [&_h2]:text-[11px] [&_h3]:text-[11px] [&_h4]:text-[11px]"
+                      />
                     </span>
                   )}
                   {r.linked.length > 0 && (
