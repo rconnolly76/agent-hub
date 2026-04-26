@@ -82,7 +82,15 @@ function fallbackStepByPriority(
   if (priority === 4) {
     return "Convert accepted findings into tracked tickets with clear owners, effort estimates, and done-when criteria.";
   }
-  return "Re-run the skill after changes and compare trendlines (critical/warning counts and summary score) to confirm improvement.";
+  const defaults = [
+    "Re-run the skill after changes and compare trendlines (critical/warning counts and summary score) to confirm improvement.",
+    "Add a small regression check (snapshot, test, or script) so this class of issue can’t silently return.",
+    "Document the decision and rollout plan (who owns it, scope boundaries, and when it’s considered done).",
+    "If this impacts user-facing flows, validate on mobile + low-bandwidth scenarios before shipping.",
+    "Create follow-up tickets for any deferred items and schedule the next review cycle.",
+  ];
+  // Rotate stable defaults for priority >= 5 to avoid duplicate fallbacks.
+  return defaults[(priority - 5) % defaults.length];
 }
 
 function buildPrioritizedNextSteps(opts: EnsureSummaryOptions): string[] {
@@ -130,21 +138,10 @@ function buildPrioritizedNextSteps(opts: EnsureSummaryOptions): string[] {
   let guard = 0;
   while (steps.length < 5 && guard < 25) {
     const fallbackBase = fallbackStepByPriority(priority, opts).trim();
-    let candidate = fallbackBase;
-    let key = candidate.toLowerCase();
-
-    // If the fallback is already present, generate a unique-but-equivalent variant.
-    // This preserves the "5 steps" contract without risking an infinite loop.
-    let bump = 0;
-    while (seen.has(key) && bump < 5) {
-      bump += 1;
-      candidate = `${fallbackBase} (alt ${priority}.${bump})`;
-      key = candidate.toLowerCase();
-    }
-
+    const key = fallbackBase.toLowerCase();
     if (!seen.has(key)) {
       seen.add(key);
-      steps.push(candidate);
+      steps.push(fallbackBase);
     }
 
     priority += 1;
