@@ -89,8 +89,10 @@ function fallbackStepByPriority(
     "If this impacts user-facing flows, validate on mobile + low-bandwidth scenarios before shipping.",
     "Create follow-up tickets for any deferred items and schedule the next review cycle.",
   ];
-  // Rotate stable defaults for priority >= 5 to avoid duplicate fallbacks.
-  return defaults[(priority - 5) % defaults.length];
+  // Rotate stable defaults. JS `%` is signed — use a nonnegative index (e.g. priority 3 → 3, not -2).
+  const idx =
+    ((priority - 5) % defaults.length + defaults.length) % defaults.length;
+  return defaults[idx];
 }
 
 function buildPrioritizedNextSteps(opts: EnsureSummaryOptions): string[] {

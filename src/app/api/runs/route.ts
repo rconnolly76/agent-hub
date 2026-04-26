@@ -283,7 +283,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (isContentBundle) {
-      return ingestContentBundle({
+      return await ingestContentBundle({
         formData,
         project,
         skillType,
@@ -295,7 +295,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    return ingestReportArtifact({
+    return await ingestReportArtifact({
       formData,
       project,
       skillType,
