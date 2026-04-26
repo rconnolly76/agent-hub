@@ -158,12 +158,26 @@ function fileField(absPath, filename) {
   return new File([buf], name, { type: mime });
 }
 
+/** Keep at or above Vercel’s `maxDuration` for /api/runs (see agent-hub) so the client does not abort first. */
+const DEFAULT_FETCH_TIMEOUT_MS = 300_000;
+
+function fetchTimeoutMs() {
+  const raw = process.env.AGENT_HUB_PUSH_TIMEOUT_MS;
+  if (raw == null || raw === "") return DEFAULT_FETCH_TIMEOUT_MS;
+  const n = parseInt(String(raw), 10);
+  return Number.isFinite(n) && n > 0 ? n : DEFAULT_FETCH_TIMEOUT_MS;
+}
+
 async function postRun(form) {
+  const timeout = fetchTimeoutMs();
+  const controller = new AbortController();
+  const t = setTimeout(() => controller.abort(), timeout);
   const res = await fetch(`${endpoint}/api/runs`, {
     method: "POST",
     headers: { "x-api-key": apiKey },
     body: form,
-  });
+    signal: controller.signal,
+  }).finally(() => clearTimeout(t));
   const text = await res.text();
   let json;
   try {
@@ -325,14 +339,28 @@ async function pushReportJob(job) {
         form.append(`config:${name}`, fileField(join(cfgDir, name), name));
       }
     }
-    const shotDir = jr.screenshotsDir
-      ? join(root, jr.screenshotsDir)
-      : join(root, "ux-journey-screenshots");
-    if (existsSync(shotDir)) {
-      for (const name of readdirSync(shotDir)) {
-        if (!name.endsWith(".png")) continue;
-        form.append(`screenshot:${name}`, fileField(join(shotDir, name), name));
+    // Opt-in: attach PNGs only when explicitly true. If agent-hub.push.json is missing,
+    // defaulting "on" produced multi‑MB requests that stalled the Hub ingest and looked like a hang.
+    const includeScreenshots = jr.includeScreenshots === true || jr.uploadScreenshots === true;
+    if (includeScreenshots) {
+      const shotDir = jr.screenshotsDir
+        ? join(root, jr.screenshotsDir)
+        : join(root, "ux-journey-screenshots");
+      if (existsSync(shotDir)) {
+        let n = 0;
+        for (const name of readdirSync(shotDir)) {
+          if (!name.endsWith(".png")) continue;
+          form.append(`screenshot:${name}`, fileField(join(shotDir, name), name));
+          n += 1;
+        }
+        console.warn(
+          `suite-registry-push: ux-journey-reviewer attached ${n} screenshot PNG (opt-in)`,
+        );
       }
+    } else {
+      console.warn(
+        "suite-registry-push: ux-journey-reviewer skipping screenshot PNGs (set includeScreenshots: true in agent-hub.push.json to send them)",
+      );
     }
     const jrSideNested = join(root, "_suite-out", ".agent-hub-sidecars", "ux-journey-reviewer");
     const jrSide =
@@ -430,8 +458,13 @@ for (const job of jobs) {
     results.push({ skill: job.skill, ok: true, data });
     console.log(`ok\t${job.skill}\t${data?.id || data?.runId || ""}`);
   } catch (e) {
-    errors.push({ skill: job.skill, message: e.message, body: e.body });
-    console.error(`fail\t${job.skill}\t${e.message}`);
+    const extra =
+      e && typeof e === "object" && e.cause != null
+        ? `; cause: ${e.cause instanceof Error ? e.cause.message : String(e.cause)}`
+        : "";
+    const msg = `${e?.message || String(e)}${extra}`;
+    errors.push({ skill: job.skill, message: msg, body: e?.body });
+    console.error(`fail\t${job.skill}\t${msg}`);
   }
 }
 

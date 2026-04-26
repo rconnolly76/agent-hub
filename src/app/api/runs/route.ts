@@ -416,72 +416,86 @@ async function ingestReportArtifact(opts: {
 
   const uploadedScreenshots: string[] = [];
   const entries = Array.from(formData.entries());
+  const artifactTasks: Promise<void>[] = [];
   for (const [key, value] of entries) {
     if (key.startsWith("screenshot:") && isBlobLike(value)) {
       const filename =
         value instanceof File ? value.name : key.slice("screenshot:".length);
-      const blob = await putBlob(
-        `${project.name}/${skillType}/screenshots/${filename}`,
-        value,
-        {
-          access: "public",
-          contentType: value.type || "image/png",
-          addRandomSuffix: true,
-        }
+      artifactTasks.push(
+        (async () => {
+          const blob = await putBlob(
+            `${project.name}/${skillType}/screenshots/${filename}`,
+            value,
+            {
+              access: "public",
+              contentType: value.type || "image/png",
+              addRandomSuffix: true,
+            }
+          );
+
+          await db.insert(artifactsTable).values({
+            runId: run.id,
+            filename,
+            mimeType: value.type || "image/png",
+            blobUrl: blob.url,
+            role: "screenshot",
+          });
+          uploadedScreenshots.push(filename);
+        })()
       );
-
-      await db.insert(artifactsTable).values({
-        runId: run.id,
-        filename,
-        mimeType: value.type || "image/png",
-        blobUrl: blob.url,
-        role: "screenshot",
-      });
-
-      uploadedScreenshots.push(filename);
     }
 
     if (key.startsWith("config:") && isBlobLike(value)) {
       const filename =
         value instanceof File ? value.name : key.slice("config:".length);
-      const configContent = await value.text();
-      const blob = await putBlob(
-        `${project.name}/${skillType}/configs/${filename}`,
-        configContent,
-        {
-          access: "public",
-          contentType: "application/json",
-          addRandomSuffix: true,
-        }
-      );
+      artifactTasks.push(
+        (async () => {
+          const configContent = await value.text();
+          const blob = await putBlob(
+            `${project.name}/${skillType}/configs/${filename}`,
+            configContent,
+            {
+              access: "public",
+              contentType: "application/json",
+              addRandomSuffix: true,
+            }
+          );
 
-      await db.insert(artifactsTable).values({
-        runId: run.id,
-        filename,
-        mimeType: "application/json",
-        blobUrl: blob.url,
-        role: "config",
-      });
+          await db.insert(artifactsTable).values({
+            runId: run.id,
+            filename,
+            mimeType: "application/json",
+            blobUrl: blob.url,
+            role: "config",
+          });
+        })()
+      );
     }
 
     if (key === "journeyMap" && isBlobLike(value)) {
       const filename = value instanceof File ? value.name : "journey-map.md";
-      const mapContent = await value.text();
-      const blob = await putBlob(
-        `${project.name}/${skillType}/journey-map-${Date.now()}.md`,
-        mapContent,
-        { access: "public", contentType: "text/markdown", addRandomSuffix: true }
-      );
+      const journeyMapStamp = Date.now();
+      artifactTasks.push(
+        (async () => {
+          const mapContent = await value.text();
+          const blob = await putBlob(
+            `${project.name}/${skillType}/journey-map-${journeyMapStamp}.md`,
+            mapContent,
+            { access: "public", contentType: "text/markdown", addRandomSuffix: true }
+          );
 
-      await db.insert(artifactsTable).values({
-        runId: run.id,
-        filename,
-        mimeType: "text/markdown",
-        blobUrl: blob.url,
-        role: "journey-map",
-      });
+          await db.insert(artifactsTable).values({
+            runId: run.id,
+            filename,
+            mimeType: "text/markdown",
+            blobUrl: blob.url,
+            role: "journey-map",
+          });
+        })()
+      );
     }
   }
+  await Promise.all(artifactTasks);
 
   return NextResponse.json(
     {

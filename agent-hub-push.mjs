@@ -161,6 +161,21 @@ function textFile(absPath, filename, mime) {
 }
 
 /**
+ * Binary images: use File (not Blob) for the same reason as textFile — Node's FormData
+ * serializes File parts with a reliable filename; Blob parts are less consistent across
+ * runtimes. Mime must be image/jpeg for .jpg/.jpeg (not image/jpg). Matches
+ * scripts/suite-registry-push.mjs `fileField` for PNGs.
+ */
+function imageFile(absPath, filename) {
+  const buf = fs.readFileSync(absPath);
+  const lower = filename.toLowerCase();
+  let type = "image/png";
+  if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) type = "image/jpeg";
+  else if (lower.endsWith(".webp")) type = "image/webp";
+  return new File([buf], filename, { type });
+}
+
+/**
  * Optional sidecar contract for richer Run Detail rendering.
  * If present, it is sent as JSON text field `runDetailContract`.
  */
@@ -400,11 +415,10 @@ async function push() {
       ]);
       for (const filename of screenshots) {
         const filePath = path.join(screenshotsDir, filename);
-        const ext = path.extname(filename).slice(1).toLowerCase();
-        const fileBlob = new Blob([fs.readFileSync(filePath)], {
-          type: `image/${ext}`,
-        });
-        formData.append(`screenshot:${filename}`, fileBlob, filename);
+        formData.append(
+          `screenshot:${filename}`,
+          imageFile(filePath, filename)
+        );
         console.log(`  + screenshot: ${filename}`);
       }
 
@@ -493,11 +507,10 @@ async function push() {
       ]);
       for (const filename of screenshots) {
         const filePath = path.join(screenshotsDir, filename);
-        const ext = path.extname(filename).slice(1).toLowerCase();
-        const fileBlob = new Blob([fs.readFileSync(filePath)], {
-          type: `image/${ext}`,
-        });
-        formData.append(`screenshot:${filename}`, fileBlob, filename);
+        formData.append(
+          `screenshot:${filename}`,
+          imageFile(filePath, filename)
+        );
         console.log(`  + screenshot: ${filename}`);
       }
     } else if (
@@ -530,12 +543,22 @@ async function push() {
 
   console.log("\nPushing to Agent Hub...");
 
+  const pushTimeoutMs = (() => {
+    const raw = process.env.AGENT_HUB_PUSH_TIMEOUT_MS;
+    if (raw == null || raw === "") return 300_000;
+    const n = parseInt(String(raw), 10);
+    return Number.isFinite(n) && n > 0 ? n : 300_000;
+  })();
+
   try {
+    const controller = new AbortController();
+    const t = setTimeout(() => controller.abort(), pushTimeoutMs);
     const res = await fetch(`${endpoint}/api/runs`, {
       method: "POST",
       headers: { "x-api-key": apiKey },
       body: formData,
-    });
+      signal: controller.signal,
+    }).finally(() => clearTimeout(t));
 
     if (!res.ok) {
       const text = await res.text();
@@ -556,7 +579,13 @@ async function push() {
     }
     console.log(`  View at:     ${endpoint}${data.url}`);
   } catch (err) {
-    console.error(`Push failed: ${err.message}`);
+    if (err.name === "AbortError") {
+      console.error(
+        `Push failed: request exceeded AGENT_HUB_PUSH_TIMEOUT_MS (${pushTimeoutMs}ms) — large screenshot payloads need a longer timeout or fewer images.`
+      );
+    } else {
+      console.error(`Push failed: ${err.message}`);
+    }
     process.exit(1);
   }
 }
