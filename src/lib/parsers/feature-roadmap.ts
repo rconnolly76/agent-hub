@@ -239,6 +239,38 @@ function extractHorizonFindings(md: string): ParsedFinding[] {
     findings.push(...parseHorizonTableRows(body, label));
   }
 
+  // Fallback: allow H2 sections with bullet lists, e.g.
+  // "## Now (0–6 weeks)" then "- OP-001: thing".
+  if (findings.length === 0) {
+    const h2 = /^##\s+(Now|Next|Later)\b[^\n]*$/gim;
+    const headers = [...hay.matchAll(h2)];
+
+    for (let i = 0; i < headers.length; i++) {
+      const m = headers[i];
+      const label = m[1].toLowerCase();
+      const start = m.index! + m[0].length;
+      const end = i + 1 < headers.length ? headers[i + 1].index! : hay.length;
+      const body = hay.slice(start, end);
+
+      for (const line of body.split("\n")) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith("-")) continue;
+        const mm = trimmed.match(/^-+\s*(OP-\d+)\s*:\s*(.+?)\s*$/i);
+        if (!mm) continue;
+        const oppId = mm[1].toUpperCase();
+        const title = mm[2].trim();
+        if (!title) continue;
+        findings.push({
+          severity: "info",
+          title: `${oppId} — ${title}`,
+          description: title,
+          category: `roadmap-${label}`,
+          recommendation: { what: title },
+        });
+      }
+    }
+  }
+
   return findings;
 }
 
