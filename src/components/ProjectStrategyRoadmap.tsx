@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { RoadmapMarkdown } from "@/components/RoadmapMarkdown";
 import type {
   ProjectStrategySnapshot,
   StrategyRoadmapRow,
@@ -56,19 +57,25 @@ function RoadmapCard({ row }: { row: StrategyRoadmapRow }) {
           <dt className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/90 mb-0.5">
             What
           </dt>
-          <dd className="text-muted-foreground">{row.what}</dd>
+          <dd className="text-muted-foreground">
+            <RoadmapMarkdown content={row.what} />
+          </dd>
         </div>
         <div>
           <dt className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/90 mb-0.5">
             Why
           </dt>
-          <dd className="text-muted-foreground/95">{row.why}</dd>
+          <dd className="text-muted-foreground/95">
+            <RoadmapMarkdown content={row.why} />
+          </dd>
         </div>
         <div>
           <dt className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/90 mb-0.5">
             Who / where it lives
           </dt>
-          <dd className="text-muted-foreground">{row.who}</dd>
+          <dd className="text-muted-foreground">
+            <RoadmapMarkdown content={row.who} />
+          </dd>
         </div>
       </dl>
     </div>
