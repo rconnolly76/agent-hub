@@ -24,6 +24,7 @@ const HORIZON_KEYS: Array<keyof typeof HORIZON_STYLE> = [
   "Later",
   "Gated",
 ];
+const VISIBLE_HORIZONS = ["Now", "Next"] as const;
 
 function parseFindingHash(): string | null {
   if (typeof window === "undefined") return null;
@@ -119,6 +120,8 @@ export function ProjectHorizonsBoard({
   }, []);
 
   const selected = selectedId ? byId.get(selectedId) : null;
+  const gatedCount = byHorizon.Gated.length;
+  const laterCount = byHorizon.Later.length;
 
   return (
     <div
@@ -128,16 +131,22 @@ export function ProjectHorizonsBoard({
         "lg:gap-6"
       )}
     >
-      <div className="min-w-0 grid grid-cols-1 min-[640px]:grid-cols-2 min-[1200px]:grid-cols-4 gap-3 sm:gap-3">
-        {HORIZON_KEYS.map((h) => (
-          <HorizonColumn
-            key={h}
-            horizon={h}
-            items={byHorizon[h]}
-            selectedId={selectedId}
-            onSelect={select}
-          />
-        ))}
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center justify-end gap-2 pb-2">
+          <CountBadge label="Gated" n={gatedCount} dot={HORIZON_STYLE.Gated.dot} />
+          <CountBadge label="Later" n={laterCount} dot={HORIZON_STYLE.Later.dot} />
+        </div>
+        <div className="grid grid-cols-1 min-[640px]:grid-cols-2 gap-3 sm:gap-3">
+          {VISIBLE_HORIZONS.map((h) => (
+            <HorizonColumn
+              key={h}
+              horizon={h}
+              items={byHorizon[h]}
+              selectedId={selectedId}
+              onSelect={select}
+            />
+          ))}
+        </div>
       </div>
 
       <aside
@@ -177,6 +186,38 @@ export function ProjectHorizonsBoard({
         </div>
       </aside>
     </div>
+  );
+}
+
+function CountBadge({
+  label,
+  n,
+  dot,
+}: {
+  label: string;
+  n: number;
+  dot: string;
+}) {
+  return (
+    <span
+      className="inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.02] px-3 py-1 text-[11px] text-white/75"
+      style={{ fontVariantNumeric: "tabular-nums" }}
+      aria-label={`${label}: ${n}`}
+      title={`${label}: ${n}`}
+    >
+      <span
+        aria-hidden
+        style={{
+          width: 6,
+          height: 6,
+          borderRadius: 99,
+          background: dot,
+          boxShadow: `0 0 8px ${dot}66`,
+        }}
+      />
+      <span style={{ fontWeight: 600, letterSpacing: -0.1 }}>{label}</span>
+      <span style={{ color: "rgba(250,250,250,0.45)" }}>{n}</span>
+    </span>
   );
 }
 
