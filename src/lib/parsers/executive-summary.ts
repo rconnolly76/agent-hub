@@ -125,14 +125,30 @@ function buildPrioritizedNextSteps(opts: EnsureSummaryOptions): string[] {
   }
 
   let priority = steps.length + 1;
-  while (steps.length < 5) {
-    const fallback = fallbackStepByPriority(priority, opts);
-    const key = fallback.toLowerCase();
+  // Safety: ensure we never spin forever if fallbacks collide with existing steps.
+  // (e.g. if a recommendation matches a fallback verbatim, priority>=5 repeats the same fallback.)
+  let guard = 0;
+  while (steps.length < 5 && guard < 25) {
+    const fallbackBase = fallbackStepByPriority(priority, opts).trim();
+    let candidate = fallbackBase;
+    let key = candidate.toLowerCase();
+
+    // If the fallback is already present, generate a unique-but-equivalent variant.
+    // This preserves the "5 steps" contract without risking an infinite loop.
+    let bump = 0;
+    while (seen.has(key) && bump < 5) {
+      bump += 1;
+      candidate = `${fallbackBase} (alt ${priority}.${bump})`;
+      key = candidate.toLowerCase();
+    }
+
     if (!seen.has(key)) {
       seen.add(key);
-      steps.push(fallback);
+      steps.push(candidate);
     }
+
     priority += 1;
+    guard += 1;
   }
 
   return steps.slice(0, 5);
