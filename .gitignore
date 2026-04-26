@@ -36,6 +36,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# agentic suite in-progress run (phase sequencing; start fresh with suite start)
+/_suite-run-state.json
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

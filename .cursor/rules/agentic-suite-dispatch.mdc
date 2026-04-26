@@ -1,0 +1,20 @@
+---
+description: Enforced sequencing for the agentic skill suite (suite-dispatch, npm run suite:*)
+globs: "**"
+alwaysApply: true
+---
+
+# Agentic suite orchestration (mandatory when running the full suite)
+
+When the user asks to run the **agentic suite**, the **full analysis pipeline**, or **all suite skills** in this repo:
+
+1. **Start from the state machine** — from the project root, run:
+   - `npm run suite:start` (or `node scripts/suite-dispatch.mjs start`). If `_suite-run-state.json` already exists, use `suite:start` with `--force` only when the user explicitly wants a new run; otherwise use `next` to continue the current run.
+2. **Loop until the suite is done** — in the same session, repeat until `npm run suite:next` outputs JSON with `"done": true`:
+   - Parse the JSON: `phase` and the `skills` list (or `"done": true` and stop).
+   - For each skill in that phase, read and follow `~/.cursor/skills/{skill}/SKILL.md` (or your symlinked skills root per the agentic-suite registry) — **only** those skills for the current phase, not a whole-phase batch from later phases.
+   - When all outputs for that phase exist, run `npm run suite:complete -- --phase <N>` and wait for **exit 0** before **starting** any work for a higher phase number. Example: `npm run suite:complete -- --phase 4 --confirm` for the publish phase (per project docs).
+3. **Do not** start Phase 2+ (or any higher phase) until the relevant `complete` for the prior phase has succeeded. Rely on terminal exit codes, not on “files already on disk from an old run.”
+4. Optional checks: `npm run suite:assert -- --phase <N>` before working on a phase, if you need a quick gate. Details: [scripts/README.md](scripts/README.md) (suite-dispatch, suite-validate).
+
+If `scripts/suite-dispatch.mjs` is missing, fall back to the `agentic-suite` skill; otherwise this repo’s **npm** commands are the source of truth for ordering.
