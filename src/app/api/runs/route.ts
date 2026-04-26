@@ -408,6 +408,9 @@ async function ingestReportArtifact(opts: {
     findings: findingsForRun.length,
     hasTopRecommendations: Boolean(topRecommendations),
   });
+  timing("before ensureExecutiveSummaryWithNextSteps()", {
+    willEnsure: Boolean(topRecommendations),
+  });
   const executiveSummary = topRecommendations
     ? ensureExecutiveSummaryWithNextSteps(parsed.executiveSummary, {
         skillType,
@@ -416,8 +419,11 @@ async function ingestReportArtifact(opts: {
         topRecommendations: topRecommendations.recommendations,
       })
     : parsed.executiveSummary;
-  timing("ensureExecutiveSummaryWithNextSteps()");
+  timing("after ensureExecutiveSummaryWithNextSteps()", {
+    executiveSummaryBytes: executiveSummary.length,
+  });
 
+  timing("before putBlob(report)");
   const reportBlob = await putBlob(
     `${project.name}/${skillType}/report-${Date.now()}.md`,
     reportMarkdown,
