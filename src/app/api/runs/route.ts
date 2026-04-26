@@ -158,7 +158,16 @@ function parseOptionalTopRecommendations(input: FormDataEntryValue | null) {
 
 export async function POST(req: NextRequest) {
   try {
+    const requestStartedAt = Date.now();
     const formData = await req.formData();
+    console.info(
+      JSON.stringify({
+        tag: "hub_ingest_timing",
+        phase: "POST:/api/runs",
+        step: "req.formData()",
+        elapsedMs: Date.now() - requestStartedAt,
+      })
+    );
 
     const apiKey = req.headers.get("x-api-key") ?? formData.get("apiKey");
     if (!apiKey || typeof apiKey !== "string") {
@@ -173,6 +182,15 @@ export async function POST(req: NextRequest) {
       .from(projects)
       .where(eq(projects.apiKey, apiKey))
       .limit(1);
+    console.info(
+      JSON.stringify({
+        tag: "hub_ingest_timing",
+        phase: "POST:/api/runs",
+        step: "project lookup",
+        elapsedMs: Date.now() - requestStartedAt,
+        ok: Boolean(project),
+      })
+    );
 
     if (!project) {
       return NextResponse.json(
@@ -188,6 +206,15 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+    console.info(
+      JSON.stringify({
+        tag: "hub_ingest_timing",
+        phase: "POST:/api/runs",
+        step: "skillType resolved",
+        elapsedMs: Date.now() - requestStartedAt,
+        skillType,
+      })
+    );
 
     const artifactTypeRaw = formData.get("artifactType");
     const isContentBundle =
@@ -203,6 +230,15 @@ export async function POST(req: NextRequest) {
       const message = e instanceof Error ? e.message : String(e);
       return NextResponse.json({ error: message }, { status: 400 });
     }
+    console.info(
+      JSON.stringify({
+        tag: "hub_ingest_timing",
+        phase: "POST:/api/runs",
+        step: "suite fields parsed",
+        elapsedMs: Date.now() - requestStartedAt,
+        suiteRunId: suiteFields.suiteRunId ?? null,
+      })
+    );
 
     let providedRunDetailContract: ReturnType<typeof parseOptionalRunDetailContract> =
       null;
@@ -309,6 +345,18 @@ async function ingestReportArtifact(opts: {
   providedTopRecommendations: ReturnType<typeof parseOptionalTopRecommendations>;
   suiteFields: ReturnType<typeof parseSuiteFieldsFromFormData>;
 }) {
+  const ingestStartedAt = Date.now();
+  const timing = (step: string, extra?: Record<string, unknown>) => {
+    console.info(
+      JSON.stringify({
+        tag: "hub_ingest_timing",
+        phase: "ingestReportArtifact",
+        step,
+        elapsedMs: Date.now() - ingestStartedAt,
+        ...extra,
+      })
+    );
+  };
   const {
     formData,
     project,
@@ -319,6 +367,7 @@ async function ingestReportArtifact(opts: {
     providedTopRecommendations,
     suiteFields,
   } = opts;
+  timing("start", { skillType, suiteRunId: suiteFields.suiteRunId ?? null });
 
   const catalogFamily = skillFamilyForSkillType(skillType);
 
@@ -331,10 +380,14 @@ async function ingestReportArtifact(opts: {
   }
 
   const reportMarkdown = await reportFile.text();
+  timing("reportFile.text()", { bytes: reportMarkdown.length });
   const reportFilename =
     reportFile instanceof File ? reportFile.name : "report.md";
 
   const auxiliaryConfigs = await extractAuxiliaryStrategyConfigs(formData);
+  timing("auxiliary configs extracted", {
+    hasAuxiliaryConfigs: Boolean(auxiliaryConfigs),
+  });
 
   const parsed = parseReportForIngest(reportMarkdown, {
     skillType,
@@ -342,11 +395,19 @@ async function ingestReportArtifact(opts: {
     override,
     auxiliaryConfigs,
   });
+  timing("parseReportForIngest()", {
+    metrics: parsed.metrics.length,
+    findings: parsed.findings.length,
+  });
   const topRecommendations = providedTopRecommendations;
   const findingsForRun = mergeFindingsWithTopRecommendations(
     parsed.findings,
     topRecommendations
   );
+  timing("mergeFindingsWithTopRecommendations()", {
+    findings: findingsForRun.length,
+    hasTopRecommendations: Boolean(topRecommendations),
+  });
   const executiveSummary = topRecommendations
     ? ensureExecutiveSummaryWithNextSteps(parsed.executiveSummary, {
         skillType,
@@ -355,12 +416,14 @@ async function ingestReportArtifact(opts: {
         topRecommendations: topRecommendations.recommendations,
       })
     : parsed.executiveSummary;
+  timing("ensureExecutiveSummaryWithNextSteps()");
 
   const reportBlob = await putBlob(
     `${project.name}/${skillType}/report-${Date.now()}.md`,
     reportMarkdown,
     { access: "public", contentType: "text/markdown", addRandomSuffix: true }
   );
+  timing("putBlob(report)");
 
   const baseMeta = {
     artifactType: "report" as const,
@@ -381,6 +444,7 @@ async function ingestReportArtifact(opts: {
       ),
     })
     .returning();
+  timing("db.insert(runs)");
 
   await db.insert(artifactsTable).values({
     runId: run.id,
@@ -389,6 +453,7 @@ async function ingestReportArtifact(opts: {
     blobUrl: reportBlob.url,
     role: "report",
   });
+  timing("db.insert(artifacts:report)");
 
   if (parsed.metrics.length > 0) {
     await db.insert(metricsTable).values(
@@ -399,6 +464,7 @@ async function ingestReportArtifact(opts: {
         unit: m.unit ?? null,
       }))
     );
+    timing("db.insert(metrics)", { metrics: parsed.metrics.length });
   }
 
   if (findingsForRun.length > 0) {
@@ -412,6 +478,7 @@ async function ingestReportArtifact(opts: {
         recommendation: f.recommendation,
       }))
     );
+    timing("db.insert(findings)", { findings: findingsForRun.length });
   }
 
   const uploadedScreenshots: string[] = [];
@@ -496,6 +563,7 @@ async function ingestReportArtifact(opts: {
     }
   }
   await Promise.all(artifactTasks);
+  timing("Promise.all(artifactTasks)", { artifacts: artifactTasks.length });
 
   return NextResponse.json(
     {

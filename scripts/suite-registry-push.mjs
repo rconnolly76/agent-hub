@@ -172,12 +172,25 @@ async function postRun(form) {
   const timeout = fetchTimeoutMs();
   const controller = new AbortController();
   const t = setTimeout(() => controller.abort(), timeout);
-  const res = await fetch(`${endpoint}/api/runs`, {
-    method: "POST",
-    headers: { "x-api-key": apiKey },
-    body: form,
-    signal: controller.signal,
-  }).finally(() => clearTimeout(t));
+  const startedAt = Date.now();
+  let res;
+  try {
+    res = await fetch(`${endpoint}/api/runs`, {
+      method: "POST",
+      headers: { "x-api-key": apiKey },
+      body: form,
+      signal: controller.signal,
+    });
+  } catch (e) {
+    const elapsedMs = Date.now() - startedAt;
+    const err = new Error(
+      `fetch failed (elapsed ${elapsedMs}ms, timeout ${timeout}ms, endpoint ${endpoint})`,
+    );
+    err.cause = e;
+    throw err;
+  } finally {
+    clearTimeout(t);
+  }
   const text = await res.text();
   let json;
   try {
@@ -186,7 +199,8 @@ async function postRun(form) {
     json = { raw: text };
   }
   if (!res.ok) {
-    const err = new Error(`HTTP ${res.status}`);
+    const elapsedMs = Date.now() - startedAt;
+    const err = new Error(`HTTP ${res.status} (elapsed ${elapsedMs}ms)`);
     err.body = json;
     throw err;
   }
@@ -420,6 +434,23 @@ if (skillFilter) {
   jobs = jobs.filter((j) => j.skill === skillFilter);
 }
 
+const excludeRaw = process.env.AGENT_HUB_PUSH_EXCLUDE?.trim();
+if (excludeRaw) {
+  const ex = new Set(
+    excludeRaw
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean),
+  );
+  if (ex.size) {
+    jobs = jobs.filter((j) => !ex.has(j.skill));
+    console.warn(
+      "suite-registry-push: excluding skills (AGENT_HUB_PUSH_EXCLUDE):",
+      [...ex].join(", "),
+    );
+  }
+}
+
 if (jobs.length === 0) {
   console.log(
     JSON.stringify(
@@ -448,21 +479,64 @@ console.log(
 
 if (dryRun) process.exit(0);
 
+const PUSH_JOB_RETRIES = (() => {
+  const r = process.env.AGENT_HUB_PUSH_RETRIES;
+  if (r == null || r === "") return 1;
+  const n = parseInt(String(r), 10);
+  if (!Number.isFinite(n) || n < 1) return 1;
+  return Math.min(n, 5);
+})();
+
+function isRetriablePushError(message, e) {
+  const m = String(message).toLowerCase();
+  if (m.includes("aborted") || m.includes("fetch failed")) return true;
+  if (m.includes("econnreset") || m.includes("econnrefused") || m.includes("socket")) return true;
+  const c = e?.cause;
+  if (c instanceof Error) {
+    const cm = c.message.toLowerCase();
+    if (cm.includes("aborted") || cm.includes("timeout") || cm.includes("reset")) return true;
+  }
+  return false;
+}
+
+function delay(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
 const results = [];
 const errors = [];
 
 for (const job of jobs) {
-  try {
-    const data =
-      job.kind === "bundle" ? await pushBundleJob(job) : await pushReportJob(job);
+  let data = null;
+  let lastErr = null;
+  for (let attempt = 0; attempt < PUSH_JOB_RETRIES; attempt++) {
+    try {
+      data = job.kind === "bundle" ? await pushBundleJob(job) : await pushReportJob(job);
+      lastErr = null;
+      break;
+    } catch (e) {
+      const extra =
+        e && typeof e === "object" && e.cause != null
+          ? `; cause: ${e.cause instanceof Error ? e.cause.message : String(e.cause)}`
+          : "";
+      const msg = `${e?.message || String(e)}${extra}`;
+      lastErr = { e, msg };
+      if (attempt < PUSH_JOB_RETRIES - 1 && isRetriablePushError(msg, e)) {
+        const w = 3000 * (attempt + 1);
+        console.warn(
+          `suite-registry-push: ${job.skill} — ${msg.split("\n")[0].slice(0, 200)}; retrying in ${w}ms (attempt ${attempt + 2}/${PUSH_JOB_RETRIES})`,
+        );
+        await delay(w);
+        continue;
+      }
+      break;
+    }
+  }
+  if (data) {
     results.push({ skill: job.skill, ok: true, data });
     console.log(`ok\t${job.skill}\t${data?.id || data?.runId || ""}`);
-  } catch (e) {
-    const extra =
-      e && typeof e === "object" && e.cause != null
-        ? `; cause: ${e.cause instanceof Error ? e.cause.message : String(e.cause)}`
-        : "";
-    const msg = `${e?.message || String(e)}${extra}`;
+  } else if (lastErr) {
+    const { e, msg } = lastErr;
     errors.push({ skill: job.skill, message: msg, body: e?.body });
     console.error(`fail\t${job.skill}\t${msg}`);
   }
